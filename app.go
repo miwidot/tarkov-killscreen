@@ -69,8 +69,15 @@ func watchClipboardAuto() {
 	lastSeq := GetClipboardSequenceNumber()
 	fmt.Println("[AUTO] Watching clipboard... seq:", lastSeq)
 
+	ticker := 0
 	for watching {
 		time.Sleep(500 * time.Millisecond)
+		ticker++
+
+		// Heartbeat every 30 seconds
+		if ticker%60 == 0 {
+			fmt.Printf("[AUTO] Heartbeat - still watching, seq: %d\n", lastSeq)
+		}
 
 		currentSeq := GetClipboardSequenceNumber()
 		if currentSeq != lastSeq {
@@ -82,12 +89,21 @@ func watchClipboardAuto() {
 			if HasClipboardImage() {
 				fmt.Println("[AUTO] Image detected")
 				go captureAndBatch()
+			} else {
+				fmt.Println("[AUTO] No image in clipboard (text/other)")
 			}
 		}
 	}
+	fmt.Println("[AUTO] Watcher stopped!")
 }
 
 func captureAndBatch() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("[AUTO] PANIC recovered: %v\n", r)
+		}
+	}()
+
 	batchMutex.Lock()
 
 	// Skip if currently uploading
@@ -128,19 +144,22 @@ func captureAndBatch() {
 }
 
 func processBatch() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("[BATCH] PANIC recovered: %v\n", r)
+		}
+		batchMutex.Lock()
+		batchUploading = false
+		batchMutex.Unlock()
+		fmt.Println("[BATCH] Ready for new screenshots")
+	}()
+
 	batchMutex.Lock()
 	images := batchImages
 	batchImages = nil
 	batchTimer = nil
 	batchUploading = true
 	batchMutex.Unlock()
-
-	defer func() {
-		batchMutex.Lock()
-		batchUploading = false
-		batchMutex.Unlock()
-		fmt.Println("[BATCH] Ready for new screenshots")
-	}()
 
 	if len(images) == 0 {
 		return
