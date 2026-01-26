@@ -109,6 +109,12 @@ func captureAndBatch() {
 		}
 	}()
 
+	// Check if Tarkov is running
+	if !IsTarkovRunning() {
+		fmt.Println("[AUTO] Tarkov not running, ignoring screenshot")
+		return
+	}
+
 	batchMutex.Lock()
 
 	// Skip if currently uploading
