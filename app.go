@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"os"
@@ -24,6 +26,9 @@ var (
 	batchMutex     sync.Mutex
 	batchWaitTime  = 15 * time.Second // Wait 15 seconds for more screenshots
 	batchUploading bool               // Prevent new captures during upload
+
+	// Duplicate detection
+	lastImageHash string
 )
 
 func RunApp() {
@@ -122,6 +127,15 @@ func captureAndBatch() {
 
 	fmt.Printf("[AUTO] Got image %dx%d\n", img.Bounds().Dx(), img.Bounds().Dy())
 
+	// Check for duplicate
+	hash := quickImageHash(img)
+	if hash == lastImageHash {
+		fmt.Println("[AUTO] Duplicate image detected, skipping...")
+		batchMutex.Unlock()
+		return
+	}
+	lastImageHash = hash
+
 	// Add image to batch
 	batchImages = append(batchImages, img)
 	count := len(batchImages)
@@ -150,6 +164,7 @@ func processBatch() {
 		}
 		batchMutex.Lock()
 		batchUploading = false
+		lastImageHash = "" // Reset for next batch
 		batchMutex.Unlock()
 		fmt.Println("[BATCH] Ready for new screenshots")
 	}()
@@ -298,4 +313,23 @@ func showWarning(title, message string) {
 
 func openExplorer(path string) {
 	exec.Command("explorer", path).Start()
+}
+
+// quickImageHash creates a fast hash by sampling pixels from the image
+func quickImageHash(img image.Image) string {
+	bounds := img.Bounds()
+	w, h := bounds.Dx(), bounds.Dy()
+
+	// Sample 100 pixels across the image
+	hasher := md5.New()
+	hasher.Write([]byte(fmt.Sprintf("%dx%d", w, h)))
+
+	for i := 0; i < 100; i++ {
+		x := bounds.Min.X + (i*w)/100
+		y := bounds.Min.Y + (i*h)/100
+		r, g, b, a := img.At(x, y).RGBA()
+		hasher.Write([]byte{byte(r >> 8), byte(g >> 8), byte(b >> 8), byte(a >> 8)})
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil))
 }
