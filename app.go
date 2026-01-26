@@ -1,0 +1,282 @@
+package main
+
+import (
+	"fmt"
+	"image"
+	"os"
+	"os/exec"
+	"sync"
+	"time"
+
+	"github.com/lxn/walk"
+)
+
+var (
+	mainWindow *walk.MainWindow
+	notifyIcon *walk.NotifyIcon
+	config     *Config
+	watching   bool
+	processing bool
+
+	// Auto-batching for multi-screenshot raids
+	batchImages    []image.Image
+	batchTimer     *time.Timer
+	batchMutex     sync.Mutex
+	batchWaitTime  = 15 * time.Second // Wait 15 seconds for more screenshots
+	batchUploading bool               // Prevent new captures during upload
+)
+
+func RunApp() {
+	var err error
+
+	ShowSplash()
+
+	config, err = LoadConfig()
+	if err != nil {
+		os.Exit(1)
+	}
+
+	mainWindow, err = walk.NewMainWindow()
+	if err != nil {
+		os.Exit(1)
+	}
+
+	notifyIcon, err = walk.NewNotifyIcon(mainWindow)
+	if err != nil {
+		os.Exit(1)
+	}
+	defer notifyIcon.Dispose()
+
+	icon, err := walk.NewIconFromImageForDPI(createIconImage(), 96)
+	if err == nil {
+		notifyIcon.SetIcon(icon)
+	}
+
+	notifyIcon.SetToolTip("Tarkov Screenshoter - Auto-capture active")
+	notifyIcon.SetVisible(true)
+
+	buildTrayMenu()
+
+	watching = true
+	go watchClipboardAuto()
+
+	showBalloon("Tarkov Screenshoter", "Auto-capture active! Screenshots are auto-batched (15s window).")
+
+	mainWindow.Run()
+}
+
+func watchClipboardAuto() {
+	lastSeq := GetClipboardSequenceNumber()
+	fmt.Println("[AUTO] Watching clipboard... seq:", lastSeq)
+
+	for watching {
+		time.Sleep(500 * time.Millisecond)
+
+		currentSeq := GetClipboardSequenceNumber()
+		if currentSeq != lastSeq {
+			lastSeq = currentSeq
+			fmt.Println("[AUTO] Clipboard changed, seq:", currentSeq)
+
+			time.Sleep(300 * time.Millisecond)
+
+			if HasClipboardImage() {
+				fmt.Println("[AUTO] Image detected")
+				go captureAndBatch()
+			}
+		}
+	}
+}
+
+func captureAndBatch() {
+	batchMutex.Lock()
+
+	// Skip if currently uploading
+	if batchUploading {
+		fmt.Println("[AUTO] Upload in progress, skipping...")
+		batchMutex.Unlock()
+		return
+	}
+
+	img, err := GetClipboardImage()
+	if err != nil || img == nil {
+		fmt.Println("[AUTO] Failed to get image")
+		batchMutex.Unlock()
+		return
+	}
+
+	fmt.Printf("[AUTO] Got image %dx%d\n", img.Bounds().Dx(), img.Bounds().Dy())
+
+	// Add image to batch
+	batchImages = append(batchImages, img)
+	count := len(batchImages)
+	fmt.Printf("[BATCH] Image %d added to batch\n", count)
+
+	// Show notification
+	if count == 1 {
+		showBalloon("Screenshot captured", "Waiting 15s for more screenshots...")
+	} else {
+		showBalloon("Screenshot captured", fmt.Sprintf("%d screenshots in batch. Waiting 15s...", count))
+	}
+
+	// Reset timer
+	if batchTimer != nil {
+		batchTimer.Stop()
+	}
+	batchTimer = time.AfterFunc(batchWaitTime, processBatch)
+
+	batchMutex.Unlock()
+}
+
+func processBatch() {
+	batchMutex.Lock()
+	images := batchImages
+	batchImages = nil
+	batchTimer = nil
+	batchUploading = true
+	batchMutex.Unlock()
+
+	defer func() {
+		batchMutex.Lock()
+		batchUploading = false
+		batchMutex.Unlock()
+		fmt.Println("[BATCH] Ready for new screenshots")
+	}()
+
+	if len(images) == 0 {
+		return
+	}
+
+	fmt.Printf("[BATCH] Processing %d images...\n", len(images))
+	showBalloon("Processing", fmt.Sprintf("Uploading %d screenshot(s)...", len(images)))
+
+	var resp *OCRResponse
+	var err error
+
+	if len(images) == 1 {
+		resp, err = UploadScreenshot(images[0], config)
+	} else {
+		resp, err = UploadMultipleScreenshots(images, config)
+	}
+
+	if err != nil {
+		fmt.Println("[BATCH] Error:", err)
+		showBalloon("Error", err.Error())
+		return
+	}
+
+	if resp != nil && resp.Success {
+		if !IsValidTarkovScreenshot(resp) {
+			reason := FormatKillSummary(resp)
+			fmt.Println("[BATCH] Invalid images:", reason)
+			showWarning("Not Tarkov Screenshots", reason)
+			return
+		}
+
+		summary := FormatKillSummary(resp)
+		fmt.Println("[BATCH] Success:", summary)
+
+		if resp.Data.TotalKills > 0 {
+			saveResp, err := SaveKills(resp, config)
+			if err != nil {
+				fmt.Println("[BATCH] Save error:", err)
+				showBalloon("Kill Analysis", summary+" (not saved: "+err.Error()+")")
+			} else {
+				fmt.Println("[BATCH] Saved! RaidID:", saveResp.RaidID)
+				showBalloon("Kills Saved!", summary)
+			}
+		} else {
+			showBalloon("Analysis Complete", summary)
+		}
+	} else {
+		showBalloon("Done", "No kills detected")
+	}
+}
+
+func buildTrayMenu() {
+	statusAction := walk.NewAction()
+	statusAction.SetText("Auto-capture: ON (15s batch window)")
+	statusAction.SetEnabled(false)
+	notifyIcon.ContextMenu().Actions().Add(statusAction)
+
+	tokenAction := walk.NewAction()
+	updateTokenAction(tokenAction)
+	tokenAction.SetEnabled(false)
+	notifyIcon.ContextMenu().Actions().Add(tokenAction)
+
+	notifyIcon.ContextMenu().Actions().Add(walk.NewSeparatorAction())
+
+	// Process now (skip wait)
+	processNowAction := walk.NewAction()
+	processNowAction.SetText("Process Now (skip wait)")
+	processNowAction.Triggered().Attach(func() {
+		batchMutex.Lock()
+		if batchTimer != nil {
+			batchTimer.Stop()
+			batchTimer = nil
+		}
+		batchMutex.Unlock()
+		go processBatch()
+	})
+	notifyIcon.ContextMenu().Actions().Add(processNowAction)
+
+	openFolderAction := walk.NewAction()
+	openFolderAction.SetText("Open Screenshots Folder")
+	openFolderAction.Triggered().Attach(func() {
+		openExplorer(config.ScreenshotPath)
+	})
+	notifyIcon.ContextMenu().Actions().Add(openFolderAction)
+
+	settingsAction := walk.NewAction()
+	settingsAction.SetText("Settings...")
+	settingsAction.Triggered().Attach(func() {
+		showSettings()
+	})
+	notifyIcon.ContextMenu().Actions().Add(settingsAction)
+
+	notifyIcon.ContextMenu().Actions().Add(walk.NewSeparatorAction())
+
+	exitAction := walk.NewAction()
+	exitAction.SetText("Exit")
+	exitAction.Triggered().Attach(func() {
+		watching = false
+		walk.App().Exit(0)
+	})
+	notifyIcon.ContextMenu().Actions().Add(exitAction)
+}
+
+func updateTokenAction(action *walk.Action) {
+	if HasToken() {
+		token, _ := LoadToken()
+		if len(token) > 8 {
+			action.SetText("Token: " + token[:4] + "..." + token[len(token)-4:])
+		} else {
+			action.SetText("Token: OK")
+		}
+	} else {
+		action.SetText("Token: NOT SET")
+	}
+}
+
+func showSettings() {
+	saved, _ := ShowSettingsDialog(nil, config)
+	if saved {
+		config, _ = LoadConfig()
+		showBalloon("Settings", "Configuration updated")
+	}
+}
+
+func showBalloon(title, message string) {
+	if notifyIcon != nil {
+		notifyIcon.ShowInfo(title, message)
+	}
+}
+
+func showWarning(title, message string) {
+	if notifyIcon != nil {
+		notifyIcon.ShowWarning(title, message)
+	}
+}
+
+func openExplorer(path string) {
+	exec.Command("explorer", path).Start()
+}

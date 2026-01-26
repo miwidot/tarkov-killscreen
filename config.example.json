@@ -1,0 +1,11 @@
+{
+  "screenshot_path": "C:\\Users\\YourName\\Pictures\\Screenshots",
+  "filename_format": "screenshot_2006-01-02_15-04-05",
+  "api": {
+    "enabled": true,
+    "url": "https://tarkov-stammtisch.de/api/ocr",
+    "mode": "kills",
+    "max_width": 1920,
+    "jpeg_quality": 85
+  }
+}

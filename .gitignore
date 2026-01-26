@@ -1,0 +1,40 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test and debug files
+*.log
+debug.log
+
+# Config with user data
+config.json
+
+# Windows resource files (generated)
+rsrc.syso
+
+# Test images/screenshots
+*.jpg
+*.jpeg
+*.png
+!logo.png
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temp folders
+a1/
+tmp/
+temp/
+
+# Go build cache
+vendor/
