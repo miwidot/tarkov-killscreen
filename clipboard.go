@@ -1,3 +1,19 @@
+// clipboard.go - Windows Clipboard API wrapper
+//
+// This file provides functions to read images from the Windows clipboard.
+// It uses standard Windows API calls (user32.dll, kernel32.dll) to:
+// - Detect clipboard changes via sequence number
+// - Check if clipboard contains image data
+// - Extract image data in DIB (Device Independent Bitmap) format
+//
+// IMPORTANT: This code only READS from the clipboard. It does not:
+// - Write to the clipboard
+// - Interact with any application
+// - Access any process memory
+//
+// The clipboard is a shared Windows resource that any application can read.
+// When a user presses PrintScreen or Win+Shift+S, Windows places the
+// screenshot in the clipboard, which we then read.
 package main
 
 import (

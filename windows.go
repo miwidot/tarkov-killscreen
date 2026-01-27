@@ -1,3 +1,19 @@
+// windows.go - Windows Process Enumeration
+//
+// This file provides functions to list running processes on Windows.
+// It uses the standard Windows Toolhelp API (kernel32.dll) to enumerate
+// all running processes and check if a specific process is running.
+//
+// IMPORTANT: This code only READS the list of process names. It does not:
+// - Open any process handles with elevated permissions
+// - Read or write process memory
+// - Inject code into processes
+// - Interact with any process in any way
+//
+// The Toolhelp API is a standard Windows API used by Task Manager and
+// many other legitimate applications to list running processes.
+// We use it solely to check if "EscapeFromTarkov.exe" is in the list,
+// so we know whether to process screenshots or ignore them.
 package main
 
 import (

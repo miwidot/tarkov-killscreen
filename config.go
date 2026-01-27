@@ -1,3 +1,13 @@
+// config.go - Configuration File Handling
+//
+// This file manages the application configuration stored in config.json.
+// The config file is stored next to the executable and contains:
+// - Screenshot save path
+// - API URL and settings
+// - JPEG quality settings
+//
+// Note: The API token is NOT stored in this file for security reasons.
+// It is stored separately in Windows Credential Manager (see credential.go).
 package main
 
 import (

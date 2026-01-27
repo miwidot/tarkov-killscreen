@@ -1,3 +1,17 @@
+// credential.go - Windows Credential Manager Integration
+//
+// This file provides secure storage for the API token using
+// Windows Credential Manager (advapi32.dll).
+//
+// The API token is stored encrypted by Windows, not in plain text.
+// This is the same secure storage used by Windows for network
+// passwords, browser credentials, and other sensitive data.
+//
+// Functions:
+// - SaveToken: Store API token in Credential Manager
+// - LoadToken: Retrieve API token from Credential Manager
+// - HasToken: Check if a token exists
+// - DeleteToken: Remove token from Credential Manager
 package main
 
 import (

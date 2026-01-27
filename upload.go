@@ -1,3 +1,19 @@
+// upload.go - HTTP Upload to OCR API
+//
+// This file handles all communication with our backend API:
+// - UploadScreenshot: Upload single image for OCR analysis
+// - UploadMultipleScreenshots: Upload batch of images
+// - SaveKills: Save analyzed kills to user's database
+//
+// All communication is HTTPS to our own server (tarkov-stammtisch.de).
+// No game servers or third-party services are contacted.
+//
+// The API flow is:
+// 1. Upload screenshot(s) to /api/ocr endpoint
+// 2. Server uses OCR to extract kill information
+// 3. Client receives structured kill data
+// 4. Client sends kill data to /api/kills/save endpoint
+// 5. Kills are stored in user's profile
 package main
 
 import (

@@ -1,3 +1,13 @@
+// version.go - Automatic Update Checker
+//
+// This file handles version checking and update notifications:
+// - Queries GitHub Releases API for the latest version
+// - Compares current version with latest release
+// - Shows Windows dialog if update is available
+// - Checks on startup and every 30 minutes
+//
+// The update check is lightweight (~1-2KB JSON response) and
+// uses minimal CPU (~5-10ms per check).
 package main
 
 import (

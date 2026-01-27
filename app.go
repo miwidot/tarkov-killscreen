@@ -1,3 +1,19 @@
+// app.go - Main Application Logic
+//
+// This file contains the core application logic:
+// - System tray icon and menu
+// - Clipboard monitoring loop
+// - Auto-batching of multiple screenshots (15 second window)
+// - Image validation (size, aspect ratio, duplicates)
+// - Coordination of upload and notifications
+//
+// The clipboard watcher runs in a background goroutine, polling the
+// clipboard sequence number every 500ms. When it changes and contains
+// an image, we capture it and add it to the current batch.
+//
+// Auto-batching allows users to take multiple screenshots of a scrollable
+// kill list. After 15 seconds of no new screenshots, all images in the
+// batch are uploaded together.
 package main
 
 import (
