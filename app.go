@@ -36,6 +36,9 @@ func RunApp() {
 
 	ShowSplash()
 
+	// Check for updates in background
+	go CheckForUpdates()
+
 	config, err = LoadConfig()
 	if err != nil {
 		os.Exit(1)
@@ -57,7 +60,7 @@ func RunApp() {
 		notifyIcon.SetIcon(icon)
 	}
 
-	notifyIcon.SetToolTip("Tarkov Screenshoter - Auto-capture active")
+	notifyIcon.SetToolTip(fmt.Sprintf("Tarkov Screenshoter %s - Auto-capture active", CurrentVersion))
 	notifyIcon.SetVisible(true)
 
 	buildTrayMenu()
@@ -65,7 +68,7 @@ func RunApp() {
 	watching = true
 	go watchClipboardAuto()
 
-	showBalloon("Tarkov Screenshoter", "Auto-capture active! Screenshots are auto-batched (15s window).")
+	showBalloon("Tarkov Screenshoter "+CurrentVersion, "Auto-capture active! Screenshots are auto-batched (15s window).")
 
 	mainWindow.Run()
 }
