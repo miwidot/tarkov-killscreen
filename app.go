@@ -3,7 +3,7 @@
 // This file contains the core application logic:
 // - System tray icon and menu
 // - Clipboard monitoring loop
-// - Auto-batching of multiple screenshots (15 second window)
+// - Auto-batching of multiple screenshots (20 second window)
 // - Image validation (size, aspect ratio, duplicates)
 // - Coordination of upload and notifications
 //
@@ -12,13 +12,11 @@
 // an image, we capture it and add it to the current batch.
 //
 // Auto-batching allows users to take multiple screenshots of a scrollable
-// kill list. After 15 seconds of no new screenshots, all images in the
+// kill list. After 20 seconds of no new screenshots, all images in the
 // batch are uploaded together.
 package main
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"image"
 	"os"
@@ -26,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/corona10/goimagehash"
 	"github.com/lxn/walk"
 )
 
@@ -40,11 +39,11 @@ var (
 	batchImages    []image.Image
 	batchTimer     *time.Timer
 	batchMutex     sync.Mutex
-	batchWaitTime  = 15 * time.Second // Wait 15 seconds for more screenshots
+	batchWaitTime  = 20 * time.Second // Wait 20 seconds for more screenshots
 	batchUploading bool               // Prevent new captures during upload
 
-	// Duplicate detection
-	lastImageHash string
+	// Duplicate detection using perceptual hash
+	lastImageHash *goimagehash.ImageHash
 )
 
 func RunApp() {
@@ -84,7 +83,7 @@ func RunApp() {
 	watching = true
 	go watchClipboardAuto()
 
-	showBalloon("Tarkov Screenshoter "+CurrentVersion, "Auto-capture active! Screenshots are auto-batched (15s window).")
+	showBalloon("Tarkov Screenshoter "+CurrentVersion, "Auto-capture active! Screenshots are auto-batched (20s window).")
 
 	mainWindow.Run()
 }
@@ -170,12 +169,19 @@ func captureAndBatch() {
 		return
 	}
 
-	// Check for duplicate
-	hash := quickImageHash(img)
-	if hash == lastImageHash {
-		fmt.Println("[AUTO] Duplicate image detected, skipping...")
-		batchMutex.Unlock()
-		return
+	// Check for duplicate using perceptual hash
+	hash, err := goimagehash.PerceptionHash(img)
+	if err != nil {
+		fmt.Printf("[AUTO] Failed to compute pHash: %v\n", err)
+	} else if lastImageHash != nil {
+		distance, _ := hash.Distance(lastImageHash)
+		fmt.Printf("[AUTO] pHash distance from last image: %d\n", distance)
+		// Distance < 10 means visually very similar (screenshot of screenshot)
+		if distance < 10 {
+			fmt.Println("[AUTO] Duplicate/similar image detected (pHash), skipping...")
+			batchMutex.Unlock()
+			return
+		}
 	}
 	lastImageHash = hash
 
@@ -186,9 +192,9 @@ func captureAndBatch() {
 
 	// Show notification
 	if count == 1 {
-		showBalloon("Screenshot captured", "Waiting 15s for more screenshots...")
+		showBalloon("Screenshot captured", "Waiting 20s for more screenshots...")
 	} else {
-		showBalloon("Screenshot captured", fmt.Sprintf("%d screenshots in batch. Waiting 15s...", count))
+		showBalloon("Screenshot captured", fmt.Sprintf("%d screenshots in batch. Waiting 20s...", count))
 	}
 
 	// Reset timer
@@ -207,7 +213,7 @@ func processBatch() {
 		}
 		batchMutex.Lock()
 		batchUploading = false
-		lastImageHash = "" // Reset for next batch
+		lastImageHash = nil // Reset for next batch
 		batchMutex.Unlock()
 		fmt.Println("[BATCH] Ready for new screenshots")
 	}()
@@ -271,7 +277,7 @@ func processBatch() {
 
 func buildTrayMenu() {
 	statusAction := walk.NewAction()
-	statusAction.SetText("Auto-capture: ON (15s batch window)")
+	statusAction.SetText("Auto-capture: ON (20s batch window)")
 	statusAction.SetEnabled(false)
 	notifyIcon.ContextMenu().Actions().Add(statusAction)
 
@@ -366,21 +372,3 @@ func isValidAspectRatio(ratio float64) bool {
 	return ratio >= 1.2 && ratio <= 3.8
 }
 
-// quickImageHash creates a fast hash by sampling pixels from the image
-func quickImageHash(img image.Image) string {
-	bounds := img.Bounds()
-	w, h := bounds.Dx(), bounds.Dy()
-
-	// Sample 100 pixels across the image
-	hasher := md5.New()
-	hasher.Write([]byte(fmt.Sprintf("%dx%d", w, h)))
-
-	for i := 0; i < 100; i++ {
-		x := bounds.Min.X + (i*w)/100
-		y := bounds.Min.Y + (i*h)/100
-		r, g, b, a := img.At(x, y).RGBA()
-		hasher.Write([]byte{byte(r >> 8), byte(g >> 8), byte(b >> 8), byte(a >> 8)})
-	}
-
-	return hex.EncodeToString(hasher.Sum(nil))
-}
