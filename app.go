@@ -145,11 +145,12 @@ func captureAndBatch() {
 		return
 	}
 
-	// Check for multi-monitor screenshots (aspect ratio > 2.5 means likely dual screen)
+	// Check for valid aspect ratios
 	aspectRatio := float64(width) / float64(height)
-	if aspectRatio > 2.5 {
-		fmt.Printf("[AUTO] Multi-monitor screenshot detected (ratio %.2f), skipping...\n", aspectRatio)
-		showWarning("Multi-Monitor", "Please capture only your Tarkov screen, not all monitors")
+	validRatio := isValidAspectRatio(aspectRatio)
+	if !validRatio {
+		fmt.Printf("[AUTO] Invalid aspect ratio (%.2f), skipping...\n", aspectRatio)
+		showWarning("Invalid Screenshot", "Aspect ratio not supported. Use 16:9, 16:10, 21:9, or 4:3")
 		batchMutex.Unlock()
 		return
 	}
@@ -340,6 +341,26 @@ func showWarning(title, message string) {
 
 func openExplorer(path string) {
 	exec.Command("explorer", path).Start()
+}
+
+// isValidAspectRatio checks if the aspect ratio matches common gaming resolutions
+func isValidAspectRatio(ratio float64) bool {
+	// Valid ratios with 10% tolerance
+	validRatios := []float64{
+		16.0 / 9.0,  // 1.778 - 1920x1080, 2560x1440, 3840x2160
+		16.0 / 10.0, // 1.600 - 1920x1200, 2560x1600
+		21.0 / 9.0,  // 2.333 - 2560x1080, 3440x1440 (ultrawide)
+		4.0 / 3.0,   // 1.333 - 1024x768, 1600x1200
+		32.0 / 9.0,  // 3.556 - 5120x1440 (super ultrawide, single monitor)
+	}
+
+	for _, valid := range validRatios {
+		tolerance := valid * 0.10 // 10% tolerance
+		if ratio >= valid-tolerance && ratio <= valid+tolerance {
+			return true
+		}
+	}
+	return false
 }
 
 // quickImageHash creates a fast hash by sampling pixels from the image
