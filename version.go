@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/lxn/walk"
 )
@@ -19,6 +20,21 @@ type GithubRelease struct {
 	TagName string `json:"tag_name"`
 	HTMLURL string `json:"html_url"`
 	Name    string `json:"name"`
+}
+
+// StartUpdateChecker runs update check on startup and every 30 minutes
+func StartUpdateChecker() {
+	// Check immediately on startup
+	CheckForUpdates()
+
+	// Then check every 30 minutes
+	ticker := time.NewTicker(30 * time.Minute)
+	go func() {
+		for range ticker.C {
+			fmt.Println("[UPDATE] Periodic check...")
+			CheckForUpdates()
+		}
+	}()
 }
 
 // CheckForUpdates checks GitHub for a newer release

@@ -36,8 +36,8 @@ func RunApp() {
 
 	ShowSplash()
 
-	// Check for updates in background
-	go CheckForUpdates()
+	// Check for updates on startup and every 30 minutes
+	go StartUpdateChecker()
 
 	config, err = LoadConfig()
 	if err != nil {
