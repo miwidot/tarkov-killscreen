@@ -110,12 +110,8 @@ func watchClipboardAuto() {
 
 			time.Sleep(300 * time.Millisecond)
 
-			if HasClipboardImage() {
-				fmt.Println("[AUTO] Image detected")
-				go captureAndBatch()
-			} else {
-				fmt.Println("[AUTO] No image in clipboard (text/other)")
-			}
+			// Try to capture directly - more reliable than checking format first
+			go captureAndBatch()
 		}
 	}
 	fmt.Println("[AUTO] Watcher stopped!")
@@ -147,7 +143,7 @@ func captureAndBatch() {
 
 	img, err := GetClipboardImage()
 	if err != nil || img == nil {
-		fmt.Println("[AUTO] Failed to get image")
+		fmt.Println("[AUTO] No image in clipboard (text/other)")
 		batchMutex.Unlock()
 		return
 	}

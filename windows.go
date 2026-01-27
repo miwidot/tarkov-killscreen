@@ -32,16 +32,12 @@ var (
 	procProcess32NextW           = kernel32.NewProc("Process32NextW")
 	procCloseHandle              = kernel32.NewProc("CloseHandle")
 	procCreateMutexW             = kernel32.NewProc("CreateMutexW")
-	procGetLastError             = kernel32.NewProc("GetLastError")
 )
 
 const (
 	ERROR_ALREADY_EXISTS = 183
-)
-
-const (
-	TH32CS_SNAPPROCESS = 0x00000002
-	MAX_PATH           = 260
+	TH32CS_SNAPPROCESS   = 0x00000002
+	MAX_PATH             = 260
 )
 
 type PROCESSENTRY32W struct {
@@ -60,20 +56,23 @@ type PROCESSENTRY32W struct {
 // IsAlreadyRunning checks if another instance of the app is already running
 // Uses a named mutex - if we can't create it because it exists, another instance is running
 func IsAlreadyRunning() bool {
-	mutexName, _ := syscall.UTF16PtrFromString("TarkovKillScreenAnalyzer_SingleInstance")
-	handle, _, _ := procCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(mutexName)))
+	mutexName, _ := syscall.UTF16PtrFromString("Global\\TarkovKillScreenAnalyzer_Mutex")
+	handle, _, err := procCreateMutexW.Call(0, 1, uintptr(unsafe.Pointer(mutexName)))
 
 	if handle == 0 {
+		fmt.Println("[MUTEX] Failed to create mutex")
 		return true // Failed to create mutex
 	}
 
-	lastErr, _, _ := procGetLastError.Call()
-	if lastErr == ERROR_ALREADY_EXISTS {
+	// In Go syscall, the error code is in err (as syscall.Errno)
+	if errno, ok := err.(syscall.Errno); ok && errno == ERROR_ALREADY_EXISTS {
+		fmt.Println("[MUTEX] Another instance is already running")
 		procCloseHandle.Call(handle)
-		return true // Another instance is running
+		return true
 	}
 
-	// Keep the mutex handle open (don't close it) - it will be released when the app exits
+	fmt.Println("[MUTEX] This is the first instance")
+	// Keep the mutex handle open - it will be released when the app exits
 	return false
 }
 
