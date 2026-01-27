@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -36,8 +37,9 @@ type PROCESSENTRY32W struct {
 
 // IsTarkovRunning checks if EscapeFromTarkov.exe is currently running
 func IsTarkovRunning() bool {
-	snapshot, _, _ := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
+	snapshot, _, err := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
 	if snapshot == 0 || snapshot == ^uintptr(0) {
+		fmt.Printf("[TARKOV] Snapshot failed: %v\n", err)
 		return false
 	}
 	defer procCloseHandle.Call(snapshot)
@@ -52,7 +54,10 @@ func IsTarkovRunning() bool {
 
 	for {
 		exeName := syscall.UTF16ToString(entry.ExeFile[:])
-		if strings.EqualFold(exeName, "EscapeFromTarkov.exe") {
+		// Check for Tarkov - also check partial match in case of different naming
+		if strings.EqualFold(exeName, "EscapeFromTarkov.exe") ||
+			strings.Contains(strings.ToLower(exeName), "escapefromtarkov") {
+			fmt.Printf("[TARKOV] Found: %s\n", exeName)
 			return true
 		}
 

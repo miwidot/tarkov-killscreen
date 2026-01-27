@@ -110,7 +110,9 @@ func captureAndBatch() {
 	}()
 
 	// Check if Tarkov is running
-	if !IsTarkovRunning() {
+	tarkovRunning := IsTarkovRunning()
+	fmt.Printf("[AUTO] Tarkov running: %v\n", tarkovRunning)
+	if !tarkovRunning {
 		fmt.Println("[AUTO] Tarkov not running, ignoring screenshot")
 		return
 	}
@@ -132,6 +134,25 @@ func captureAndBatch() {
 	}
 
 	fmt.Printf("[AUTO] Got image %dx%d\n", img.Bounds().Dx(), img.Bounds().Dy())
+
+	width := img.Bounds().Dx()
+	height := img.Bounds().Dy()
+
+	// Check minimum size (server requires 800x400)
+	if width < 800 || height < 400 {
+		fmt.Printf("[AUTO] Image too small (%dx%d), minimum 800x400, skipping...\n", width, height)
+		batchMutex.Unlock()
+		return
+	}
+
+	// Check for multi-monitor screenshots (aspect ratio > 2.5 means likely dual screen)
+	aspectRatio := float64(width) / float64(height)
+	if aspectRatio > 2.5 {
+		fmt.Printf("[AUTO] Multi-monitor screenshot detected (ratio %.2f), skipping...\n", aspectRatio)
+		showWarning("Multi-Monitor", "Please capture only your Tarkov screen, not all monitors")
+		batchMutex.Unlock()
+		return
+	}
 
 	// Check for duplicate
 	hash := quickImageHash(img)
