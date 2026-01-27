@@ -11,6 +11,22 @@
 // License: MIT
 package main
 
+import (
+	"fmt"
+	"os"
+
+	"github.com/lxn/walk"
+)
+
 func main() {
+	// Prevent multiple instances
+	if IsAlreadyRunning() {
+		walk.MsgBox(nil, "Tarkov Kill Screen Analyzer",
+			"Die Anwendung läuft bereits.\n\nThe application is already running.",
+			walk.MsgBoxIconWarning)
+		fmt.Println("Another instance is already running. Exiting.")
+		os.Exit(0)
+	}
+
 	RunApp()
 }

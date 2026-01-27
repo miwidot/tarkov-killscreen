@@ -31,6 +31,12 @@ var (
 	procProcess32FirstW          = kernel32.NewProc("Process32FirstW")
 	procProcess32NextW           = kernel32.NewProc("Process32NextW")
 	procCloseHandle              = kernel32.NewProc("CloseHandle")
+	procCreateMutexW             = kernel32.NewProc("CreateMutexW")
+	procGetLastError             = kernel32.NewProc("GetLastError")
+)
+
+const (
+	ERROR_ALREADY_EXISTS = 183
 )
 
 const (
@@ -49,6 +55,26 @@ type PROCESSENTRY32W struct {
 	PriorityClassBase int32
 	Flags             uint32
 	ExeFile           [MAX_PATH]uint16
+}
+
+// IsAlreadyRunning checks if another instance of the app is already running
+// Uses a named mutex - if we can't create it because it exists, another instance is running
+func IsAlreadyRunning() bool {
+	mutexName, _ := syscall.UTF16PtrFromString("TarkovKillScreenAnalyzer_SingleInstance")
+	handle, _, _ := procCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(mutexName)))
+
+	if handle == 0 {
+		return true // Failed to create mutex
+	}
+
+	lastErr, _, _ := procGetLastError.Call()
+	if lastErr == ERROR_ALREADY_EXISTS {
+		procCloseHandle.Call(handle)
+		return true // Another instance is running
+	}
+
+	// Keep the mutex handle open (don't close it) - it will be released when the app exits
+	return false
 }
 
 // IsTarkovRunning checks if EscapeFromTarkov.exe is currently running
