@@ -343,24 +343,12 @@ func openExplorer(path string) {
 	exec.Command("explorer", path).Start()
 }
 
-// isValidAspectRatio checks if the aspect ratio matches common gaming resolutions
+// isValidAspectRatio checks if the aspect ratio is reasonable for a game screenshot
 func isValidAspectRatio(ratio float64) bool {
-	// Valid ratios with 10% tolerance
-	validRatios := []float64{
-		16.0 / 9.0,  // 1.778 - 1920x1080, 2560x1440, 3840x2160
-		16.0 / 10.0, // 1.600 - 1920x1200, 2560x1600
-		21.0 / 9.0,  // 2.333 - 2560x1080, 3440x1440 (ultrawide)
-		4.0 / 3.0,   // 1.333 - 1024x768, 1600x1200
-		32.0 / 9.0,  // 3.556 - 5120x1440 (super ultrawide, single monitor)
-	}
-
-	for _, valid := range validRatios {
-		tolerance := valid * 0.10 // 10% tolerance
-		if ratio >= valid-tolerance && ratio <= valid+tolerance {
-			return true
-		}
-	}
-	return false
+	// Allow anything between 4:3 (1.33) and 32:9 (3.56)
+	// This covers all standard gaming resolutions plus cropped regions
+	// Only block: portrait mode (<1.2) and multi-monitor (>3.8)
+	return ratio >= 1.2 && ratio <= 3.8
 }
 
 // quickImageHash creates a fast hash by sampling pixels from the image
