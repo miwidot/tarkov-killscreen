@@ -32,6 +32,9 @@ var (
 	procProcess32NextW           = kernel32.NewProc("Process32NextW")
 	procCloseHandle              = kernel32.NewProc("CloseHandle")
 	procCreateMutexW             = kernel32.NewProc("CreateMutexW")
+	procEnumWindows              = user32.NewProc("EnumWindows")
+	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
+	procIsWindowVisible          = user32.NewProc("IsWindowVisible")
 )
 
 const (
@@ -177,7 +180,30 @@ var imageViewerProcesses = []string{
 	"screenpresso.exe",
 }
 
-// IsImageViewerRunning checks if any image viewer/editor is running
+// processHasVisibleWindow checks if a process has any visible windows
+func processHasVisibleWindow(processID uint32) bool {
+	hasVisible := false
+
+	// Callback for EnumWindows
+	callback := syscall.NewCallback(func(hwnd uintptr, lParam uintptr) uintptr {
+		var pid uint32
+		procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+
+		if pid == uint32(lParam) {
+			visible, _, _ := procIsWindowVisible.Call(hwnd)
+			if visible != 0 {
+				hasVisible = true
+				return 0 // Stop enumeration
+			}
+		}
+		return 1 // Continue enumeration
+	})
+
+	procEnumWindows.Call(callback, uintptr(processID))
+	return hasVisible
+}
+
+// IsImageViewerRunning checks if any image viewer/editor has a visible window
 // Used to prevent re-capture attempts (screenshot of screenshot)
 func IsImageViewerRunning() (bool, string) {
 	snapshot, _, err := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
@@ -200,7 +226,10 @@ func IsImageViewerRunning() (bool, string) {
 
 		for _, viewer := range imageViewerProcesses {
 			if exeName == viewer || strings.Contains(exeName, strings.TrimSuffix(viewer, ".exe")) {
-				return true, exeName
+				// Check if this process has a visible window
+				if processHasVisibleWindow(entry.ProcessID) {
+					return true, exeName
+				}
 			}
 		}
 
