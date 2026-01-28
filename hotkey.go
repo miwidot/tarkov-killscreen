@@ -23,24 +23,57 @@ import (
 
 var (
 	procGetAsyncKeyState = user32.NewProc("GetAsyncKeyState")
+	currentHotkey        uintptr = VK_SNAPSHOT // Default to Print Screen
 )
 
+// Virtual key codes
 const (
-	VK_SNAPSHOT = 0x2C // Print Screen key
+	VK_SNAPSHOT   = 0x2C // Print Screen
+	VK_F11        = 0x7A // F11
+	VK_F12        = 0x7B // F12
+	VK_SCROLL     = 0x91 // Scroll Lock
+	VK_PAUSE      = 0x13 // Pause/Break
 )
 
-// RegisterScreenshotHotkey is a no-op for polling approach
-func RegisterScreenshotHotkey() error {
-	return nil
+// HotkeyOptions defines available hotkey choices for the dropdown
+var HotkeyOptions = []string{
+	"PrintScreen",
+	"F12",
+	"F11",
+	"ScrollLock",
+	"Pause",
 }
 
-// UnregisterScreenshotHotkey is a no-op for polling approach
-func UnregisterScreenshotHotkey() {
+// HotkeyLabels maps key names to display labels
+var HotkeyLabels = map[string]string{
+	"PrintScreen": "Print Screen",
+	"F12":         "F12",
+	"F11":         "F11",
+	"ScrollLock":  "Scroll Lock",
+	"Pause":       "Pause/Break",
 }
 
-// WatchHotkey polls for Print Screen key press
+// hotkeyToVK maps key names to virtual key codes
+var hotkeyToVK = map[string]uintptr{
+	"PrintScreen": VK_SNAPSHOT,
+	"F12":         VK_F12,
+	"F11":         VK_F11,
+	"ScrollLock":  VK_SCROLL,
+	"Pause":       VK_PAUSE,
+}
+
+// SetHotkey updates the capture hotkey
+func SetHotkey(keyName string) {
+	if vk, ok := hotkeyToVK[keyName]; ok {
+		currentHotkey = vk
+		fmt.Printf("[HOTKEY] Set capture key to: %s (0x%02X)\n", keyName, vk)
+	}
+}
+
+// WatchHotkey polls for configured hotkey press
 func WatchHotkey() {
-	fmt.Println("[HOTKEY] Watching for Print Screen key (polling)...")
+	keyName := GetHotkeyName(currentHotkey)
+	fmt.Printf("[HOTKEY] Watching for %s key (polling)...\n", keyName)
 
 	var lastState int16 = 0
 
@@ -50,13 +83,13 @@ func WatchHotkey() {
 		// GetAsyncKeyState returns key state
 		// High bit (0x8000) = key is currently down
 		// Low bit (0x0001) = key was pressed since last call
-		ret, _, _ := procGetAsyncKeyState.Call(VK_SNAPSHOT)
+		ret, _, _ := procGetAsyncKeyState.Call(currentHotkey)
 		state := int16(ret)
 
 		// Detect key press (transition from not pressed to pressed)
 		// High bit set = negative in int16, so state < 0 means key is down
 		if state < 0 && lastState >= 0 {
-			fmt.Println("[HOTKEY] Print Screen pressed!")
+			fmt.Printf("[HOTKEY] %s pressed!\n", keyName)
 			go captureScreen()
 		}
 
@@ -64,6 +97,19 @@ func WatchHotkey() {
 	}
 
 	fmt.Println("[HOTKEY] Watcher stopped!")
+}
+
+// GetHotkeyName returns the display name for a virtual key code
+func GetHotkeyName(vk uintptr) string {
+	for name, code := range hotkeyToVK {
+		if code == vk {
+			if label, ok := HotkeyLabels[name]; ok {
+				return label
+			}
+			return name
+		}
+	}
+	return fmt.Sprintf("Unknown (0x%02X)", vk)
 }
 
 // captureScreen takes a screenshot directly (no clipboard involved)

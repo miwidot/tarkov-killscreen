@@ -17,8 +17,7 @@ import (
 )
 
 type HotkeyConfig struct {
-	Fullscreen   string `json:"fullscreen"`
-	ActiveWindow string `json:"active_window"`
+	CaptureKey string `json:"capture_key"` // "PrintScreen", "F12", "F11", "ScrollLock"
 }
 
 type APIConfig struct {
@@ -40,8 +39,7 @@ var defaultConfig = Config{
 	ScreenshotPath: "",
 	FilenameFormat: "screenshot_2006-01-02_15-04-05",
 	Hotkeys: HotkeyConfig{
-		Fullscreen:   "Ctrl+PrintScreen",
-		ActiveWindow: "Alt+PrintScreen",
+		CaptureKey: "PrintScreen",
 	},
 	API: APIConfig{
 		Enabled:     true,

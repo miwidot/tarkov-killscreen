@@ -58,6 +58,11 @@ func RunApp() {
 		os.Exit(1)
 	}
 
+	// Apply configured hotkey
+	if config.Hotkeys.CaptureKey != "" {
+		SetHotkey(config.Hotkeys.CaptureKey)
+	}
+
 	mainWindow, err = walk.NewMainWindow()
 	if err != nil {
 		os.Exit(1)
@@ -83,7 +88,8 @@ func RunApp() {
 
 	// Use hotkey-based capture (registers and watches on same thread)
 	go WatchHotkey()
-	showBalloon("Tarkov Screenshoter "+CurrentVersion, "Press Print Screen to capture! Screenshots are auto-batched (20s window).")
+	hotkeyName := GetHotkeyName(currentHotkey)
+	showBalloon("Tarkov Screenshoter "+CurrentVersion, fmt.Sprintf("Press %s to capture! Screenshots are auto-batched (20s window).", hotkeyName))
 
 	mainWindow.Run()
 }
@@ -283,7 +289,8 @@ func processBatch() {
 
 func buildTrayMenu() {
 	statusAction := walk.NewAction()
-	statusAction.SetText("Auto-capture: ON (20s batch window)")
+	hotkeyLabel := GetHotkeyName(currentHotkey)
+	statusAction.SetText(fmt.Sprintf("Hotkey: %s (20s batch)", hotkeyLabel))
 	statusAction.SetEnabled(false)
 	notifyIcon.ContextMenu().Actions().Add(statusAction)
 
@@ -328,7 +335,6 @@ func buildTrayMenu() {
 	exitAction.SetText("Exit")
 	exitAction.Triggered().Attach(func() {
 		watching = false
-		UnregisterScreenshotHotkey()
 		walk.App().Exit(0)
 	})
 	notifyIcon.ContextMenu().Actions().Add(exitAction)

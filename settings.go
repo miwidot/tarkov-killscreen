@@ -17,17 +17,37 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	var dlg *walk.Dialog
 	var tokenLE, pathLE, urlLE *walk.LineEdit
 	var enabledCB *walk.CheckBox
+	var hotkeyCB *walk.ComboBox
 
 	// Temporäre Variablen für Werte
 	newToken := currentToken
 	newPath := cfg.ScreenshotPath
 	newURL := cfg.API.URL
 	newEnabled := cfg.API.Enabled
+	newHotkey := cfg.Hotkeys.CaptureKey
+	if newHotkey == "" {
+		newHotkey = "PrintScreen"
+	}
+
+	// Find current hotkey index
+	hotkeyIndex := 0
+	for i, opt := range HotkeyOptions {
+		if opt == newHotkey {
+			hotkeyIndex = i
+			break
+		}
+	}
+
+	// Build hotkey labels for dropdown
+	hotkeyLabels := make([]string, len(HotkeyOptions))
+	for i, opt := range HotkeyOptions {
+		hotkeyLabels[i] = HotkeyLabels[opt]
+	}
 
 	if err := (Dialog{
 		AssignTo: &dlg,
 		Title:    "Settings",
-		MinSize:  Size{Width: 400, Height: 250},
+		MinSize:  Size{Width: 400, Height: 300},
 		Layout:   VBox{},
 		Children: []Widget{
 			Label{Text: "API Token:"},
@@ -35,6 +55,18 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 			Label{Text: "API URL:"},
 			LineEdit{AssignTo: &urlLE, Text: cfg.API.URL},
 			CheckBox{AssignTo: &enabledCB, Text: "Enable API", Checked: cfg.API.Enabled},
+			VSeparator{},
+			Label{Text: "Capture Hotkey:"},
+			ComboBox{
+				AssignTo:     &hotkeyCB,
+				Model:        hotkeyLabels,
+				CurrentIndex: hotkeyIndex,
+				OnCurrentIndexChanged: func() {
+					if hotkeyCB.CurrentIndex() >= 0 && hotkeyCB.CurrentIndex() < len(HotkeyOptions) {
+						newHotkey = HotkeyOptions[hotkeyCB.CurrentIndex()]
+					}
+				},
+			},
 			VSeparator{},
 			Label{Text: "Screenshot Path:"},
 			LineEdit{AssignTo: &pathLE, Text: cfg.ScreenshotPath},
@@ -57,6 +89,9 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 							newPath = pathLE.Text()
 							newURL = urlLE.Text()
 							newEnabled = enabledCB.Checked()
+							if hotkeyCB.CurrentIndex() >= 0 {
+								newHotkey = HotkeyOptions[hotkeyCB.CurrentIndex()]
+							}
 							dlg.Accept()
 						},
 					},
@@ -83,7 +118,12 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 		cfg.ScreenshotPath = newPath
 		cfg.API.URL = newURL
 		cfg.API.Enabled = newEnabled
+		cfg.Hotkeys.CaptureKey = newHotkey
 		SaveConfig(cfg)
+
+		// Apply hotkey change immediately
+		SetHotkey(newHotkey)
+
 		return true, nil
 	}
 
