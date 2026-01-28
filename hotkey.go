@@ -27,6 +27,22 @@ import (
 // DebugSaveScreenshot saves screenshot to debug folder for inspection
 var DebugSaveScreenshots = true // Set to false in production
 
+func init() {
+	// Set up display helper functions to avoid import cycle
+	SetDisplayFuncs(
+		func() int { return screenshot.NumActiveDisplays() },
+		func(i int) RECT {
+			b := screenshot.GetDisplayBounds(i)
+			return RECT{
+				Left:   int32(b.Min.X),
+				Top:    int32(b.Min.Y),
+				Right:  int32(b.Max.X),
+				Bottom: int32(b.Max.Y),
+			}
+		},
+	)
+}
+
 func debugSaveScreenshot(img image.Image, suffix string) {
 	if !DebugSaveScreenshots {
 		return
@@ -165,16 +181,21 @@ func captureScreen() {
 		return
 	}
 
-	// Get the primary display bounds
+	// Get the display where Tarkov is running
 	n := screenshot.NumActiveDisplays()
 	if n == 0 {
 		fmt.Println("[CAPTURE] No displays found")
 		return
 	}
 
-	// Capture primary display (index 0)
-	bounds := screenshot.GetDisplayBounds(0)
-	fmt.Printf("[CAPTURE] Capturing display 0: %dx%d\n", bounds.Dx(), bounds.Dy())
+	// Find which display Tarkov is on
+	displayIndex := GetTarkovDisplayIndex()
+	if displayIndex < 0 || displayIndex >= n {
+		displayIndex = 0 // Fallback to primary
+	}
+
+	bounds := screenshot.GetDisplayBounds(displayIndex)
+	fmt.Printf("[CAPTURE] Capturing display %d: %dx%d\n", displayIndex, bounds.Dx(), bounds.Dy())
 
 	img, err := screenshot.CaptureRect(bounds)
 	if err != nil {
