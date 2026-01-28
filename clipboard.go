@@ -153,14 +153,13 @@ func copyClipboardData() *clipboardData {
 	rowSize := ((width*bitCount + 31) / 32) * 4
 	dataSize := rowSize * height
 
-	// Quick copy of raw bytes - this is fast!
+	// Quick copy of raw bytes using native memcpy
 	rawData := make([]byte, dataSize)
 	dataPtr := ptr + uintptr(headerSize)
 
-	// Use copy via unsafe pointer - much faster than pixel-by-pixel
-	for i := 0; i < dataSize; i++ {
-		rawData[i] = *(*byte)(unsafe.Pointer(dataPtr + uintptr(i)))
-	}
+	// Use unsafe.Slice + copy - single memcpy operation instead of 8M iterations
+	srcSlice := unsafe.Slice((*byte)(unsafe.Pointer(dataPtr)), dataSize)
+	copy(rawData, srcSlice)
 
 	return &clipboardData{
 		width:    width,

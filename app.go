@@ -176,8 +176,9 @@ func captureAndBatch() {
 	} else if lastImageHash != nil {
 		distance, _ := hash.Distance(lastImageHash)
 		fmt.Printf("[AUTO] pHash distance from last image: %d\n", distance)
-		// Distance < 10 means visually very similar (screenshot of screenshot)
-		if distance < 10 {
+		// Distance < 5 means nearly identical (exact duplicate or screenshot of screenshot)
+		// Higher values (5-15) = scrolled kill list with same UI frame - ALLOW these
+		if distance < 5 {
 			fmt.Println("[AUTO] Duplicate/similar image detected (pHash), skipping...")
 			batchMutex.Unlock()
 			return
@@ -240,6 +241,12 @@ func processBatch() {
 	} else {
 		resp, err = UploadMultipleScreenshots(images, config)
 	}
+
+	// Clear images to free memory (~8MB per image)
+	for i := range images {
+		images[i] = nil
+	}
+	images = nil
 
 	if err != nil {
 		fmt.Println("[BATCH] Error:", err)
