@@ -183,6 +183,14 @@ func addToBatch(img image.Image) {
 		return
 	}
 
+	// Pre-filter: Check if this looks like a kill screen
+	prefilter := PrefilterScreenshot(img)
+	if !prefilter.IsLikelyKillScreen {
+		fmt.Printf("[CAPTURE] Prefilter rejected: %s\n", prefilter.Reason)
+		showWarning("Not a Kill Screen", prefilter.Reason)
+		return
+	}
+
 	// Add to batch
 	batchMutex.Lock()
 
