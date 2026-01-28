@@ -110,3 +110,65 @@ func IsTarkovRunning() bool {
 
 	return false
 }
+
+// Image viewer/editor process names to block (re-capture prevention)
+var imageViewerProcesses = []string{
+	// Windows built-in
+	"microsoft.photos.exe",
+	"photos.exe",
+	"mspaint.exe",
+	// Popular viewers
+	"irfanview.exe",
+	"i_view64.exe",
+	"i_view32.exe",
+	"xnview.exe",
+	"xnviewmp.exe",
+	"honeyview.exe",
+	"jpegview.exe",
+	"faststone.exe",
+	"fsviewer.exe",
+	"acdsee.exe",
+	// Editors
+	"photoshop.exe",
+	"gimp-2.10.exe",
+	"gimp.exe",
+	"paint.net.exe",
+	"paintdotnet.exe",
+	"krita.exe",
+}
+
+// IsImageViewerRunning checks if any image viewer/editor is running
+// Used to prevent re-capture attempts (screenshot of screenshot)
+func IsImageViewerRunning() (bool, string) {
+	snapshot, _, err := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
+	if snapshot == 0 || snapshot == ^uintptr(0) {
+		fmt.Printf("[VIEWER] Snapshot failed: %v\n", err)
+		return false, ""
+	}
+	defer procCloseHandle.Call(snapshot)
+
+	var entry PROCESSENTRY32W
+	entry.Size = uint32(unsafe.Sizeof(entry))
+
+	ret, _, _ := procProcess32FirstW.Call(snapshot, uintptr(unsafe.Pointer(&entry)))
+	if ret == 0 {
+		return false, ""
+	}
+
+	for {
+		exeName := strings.ToLower(syscall.UTF16ToString(entry.ExeFile[:]))
+
+		for _, viewer := range imageViewerProcesses {
+			if exeName == viewer || strings.Contains(exeName, strings.TrimSuffix(viewer, ".exe")) {
+				return true, exeName
+			}
+		}
+
+		ret, _, _ = procProcess32NextW.Call(snapshot, uintptr(unsafe.Pointer(&entry)))
+		if ret == 0 {
+			break
+		}
+	}
+
+	return false, ""
+}

@@ -124,6 +124,13 @@ func captureScreen() {
 		return
 	}
 
+	// Check if image viewer is running (re-capture prevention)
+	if isViewer, viewerName := IsImageViewerRunning(); isViewer {
+		fmt.Printf("[CAPTURE] Image viewer detected: %s - blocking to prevent re-capture\n", viewerName)
+		showWarning("Capture Blocked", fmt.Sprintf("Close %s first to prevent re-capture", viewerName))
+		return
+	}
+
 	// Get the primary display bounds
 	n := screenshot.NumActiveDisplays()
 	if n == 0 {
