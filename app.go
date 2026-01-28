@@ -235,9 +235,10 @@ func processBatch() {
 	validImages := make([]image.Image, 0, len(images))
 	for i, img := range images {
 		if VerifySignature(img) {
+			fmt.Printf("[SIGNATURE] Image %d verified ✓\n", i+1)
 			validImages = append(validImages, img)
 		} else {
-			fmt.Printf("[BATCH] Image %d failed signature check, skipping\n", i+1)
+			fmt.Printf("[SIGNATURE] Image %d FAILED verification, skipping\n", i+1)
 		}
 	}
 
