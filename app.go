@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/corona10/goimagehash"
 	"github.com/lxn/walk"
 )
 
@@ -42,8 +41,8 @@ var (
 	batchWaitTime  = 20 * time.Second // Wait 20 seconds for more screenshots
 	batchUploading bool               // Prevent new captures during upload
 
-	// Duplicate detection using perceptual hash
-	lastImageHash *goimagehash.ImageHash
+	// Queue for screenshots taken during upload
+	pendingImages []image.Image
 )
 
 func RunApp() {
@@ -133,17 +132,12 @@ func captureAndBatch() {
 
 	batchMutex.Lock()
 
-	// Skip if currently uploading
-	if batchUploading {
-		fmt.Println("[AUTO] Upload in progress, skipping...")
-		batchMutex.Unlock()
-		return
-	}
+	isUploading := batchUploading
+	batchMutex.Unlock() // Unlock early to get image without holding lock
 
 	img, err := GetClipboardImage()
 	if err != nil || img == nil {
 		fmt.Println("[AUTO] No image in clipboard (text/other)")
-		batchMutex.Unlock()
 		return
 	}
 
@@ -155,7 +149,6 @@ func captureAndBatch() {
 	// Check minimum size (server requires 800x400)
 	if width < 800 || height < 400 {
 		fmt.Printf("[AUTO] Image too small (%dx%d), minimum 800x400, skipping...\n", width, height)
-		batchMutex.Unlock()
 		return
 	}
 
@@ -165,26 +158,19 @@ func captureAndBatch() {
 	if !validRatio {
 		fmt.Printf("[AUTO] Invalid aspect ratio (%.2f), skipping...\n", aspectRatio)
 		showWarning("Invalid Screenshot", "Aspect ratio not supported. Use 16:9, 16:10, 21:9, or 4:3")
-		batchMutex.Unlock()
 		return
 	}
 
-	// Check for duplicate using perceptual hash
-	hash, err := goimagehash.PerceptionHash(img)
-	if err != nil {
-		fmt.Printf("[AUTO] Failed to compute pHash: %v\n", err)
-	} else if lastImageHash != nil {
-		distance, _ := hash.Distance(lastImageHash)
-		fmt.Printf("[AUTO] pHash distance from last image: %d\n", distance)
-		// Distance < 5 means nearly identical (exact duplicate or screenshot of screenshot)
-		// Higher values (5-15) = scrolled kill list with same UI frame - ALLOW these
-		if distance < 5 {
-			fmt.Println("[AUTO] Duplicate/similar image detected (pHash), skipping...")
-			batchMutex.Unlock()
-			return
-		}
+	// Add to pending queue if uploading, otherwise add to batch
+	batchMutex.Lock()
+	if isUploading {
+		pendingImages = append(pendingImages, img)
+		count := len(pendingImages)
+		fmt.Printf("[PENDING] Image %d added to pending queue (upload in progress)\n", count)
+		showBalloon("Screenshot queued", fmt.Sprintf("%d screenshot(s) waiting for next batch", count))
+		batchMutex.Unlock()
+		return
 	}
-	lastImageHash = hash
 
 	// Add image to batch
 	batchImages = append(batchImages, img)
@@ -214,7 +200,17 @@ func processBatch() {
 		}
 		batchMutex.Lock()
 		batchUploading = false
-		lastImageHash = nil // Reset for next batch
+
+		// Check if there are pending images from during upload
+		if len(pendingImages) > 0 {
+			fmt.Printf("[BATCH] Moving %d pending images to new batch\n", len(pendingImages))
+			batchImages = pendingImages
+			pendingImages = nil
+			// Start timer for the new batch
+			batchTimer = time.AfterFunc(batchWaitTime, processBatch)
+			showBalloon("New batch started", fmt.Sprintf("%d screenshot(s) from queue. Waiting 20s...", len(batchImages)))
+		}
+
 		batchMutex.Unlock()
 		fmt.Println("[BATCH] Ready for new screenshots")
 	}()
