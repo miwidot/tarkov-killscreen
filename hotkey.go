@@ -39,7 +39,6 @@ const (
 var HotkeyOptions = []string{
 	"PrintScreen",
 	"F12",
-	"F11",
 	"ScrollLock",
 	"Pause",
 }
@@ -48,7 +47,6 @@ var HotkeyOptions = []string{
 var HotkeyLabels = map[string]string{
 	"PrintScreen": "Print Screen",
 	"F12":         "F12",
-	"F11":         "F11",
 	"ScrollLock":  "Scroll Lock",
 	"Pause":       "Pause/Break",
 }
