@@ -117,7 +117,9 @@ var imageViewerProcesses = []string{
 	"microsoft.photos.exe",
 	"photos.exe",
 	"mspaint.exe",
-	// Popular viewers
+	"photoviewer.dll", // Old Windows Photo Viewer
+
+	// Popular free viewers
 	"irfanview.exe",
 	"i_view64.exe",
 	"i_view32.exe",
@@ -127,14 +129,52 @@ var imageViewerProcesses = []string{
 	"jpegview.exe",
 	"faststone.exe",
 	"fsviewer.exe",
+	"fsimageresize.exe",
+	"imageglass.exe",
+	"nomacs.exe",
+	"picasa3.exe",
+	"123photoviewer.exe",
+	"apowersoftviewer.exe",
+
+	// Paid viewers
 	"acdsee.exe",
-	// Editors
+	"acdseeultimate.exe",
+	"acdseestandard.exe",
+
+	// Adobe products
 	"photoshop.exe",
+	"lightroom.exe",
+	"bridge.exe",
+	"photoshopelements.exe",
+	"illustrator.exe",
+	"adobephotoshopexpress.exe",
+
+	// Other editors
 	"gimp-2.10.exe",
+	"gimp-2.8.exe",
 	"gimp.exe",
 	"paint.net.exe",
 	"paintdotnet.exe",
 	"krita.exe",
+	"affinity photo.exe",
+	"photo.exe",
+	"afphoto.exe",
+	"coreldraw.exe",
+	"paintshoppro.exe",
+	"pspx.exe",
+	"captureone.exe",
+	"darktable.exe",
+	"rawtherapee.exe",
+
+	// Screenshot tools (might have image open)
+	"snagit32.exe",
+	"snagit64.exe",
+	"snagiteditor.exe",
+	"greenshot.exe",
+	"sharex.exe",
+	"lightshot.exe",
+	"picpick.exe",
+	"screenpresso.exe",
 }
 
 // IsImageViewerRunning checks if any image viewer/editor is running
