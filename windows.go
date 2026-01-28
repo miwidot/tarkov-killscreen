@@ -35,6 +35,7 @@ var (
 	procEnumWindows              = user32.NewProc("EnumWindows")
 	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
 	procIsWindowVisible          = user32.NewProc("IsWindowVisible")
+	procIsIconic                 = user32.NewProc("IsIconic")
 )
 
 const (
@@ -180,7 +181,7 @@ var imageViewerProcesses = []string{
 	"screenpresso.exe",
 }
 
-// processHasVisibleWindow checks if a process has any visible windows
+// processHasVisibleWindow checks if a process has any visible, non-minimized windows
 func processHasVisibleWindow(processID uint32) bool {
 	hasVisible := false
 
@@ -191,7 +192,10 @@ func processHasVisibleWindow(processID uint32) bool {
 
 		if pid == uint32(lParam) {
 			visible, _, _ := procIsWindowVisible.Call(hwnd)
-			if visible != 0 {
+			minimized, _, _ := procIsIconic.Call(hwnd)
+
+			// Only count as visible if window is visible AND not minimized
+			if visible != 0 && minimized == 0 {
 				hasVisible = true
 				return 0 // Stop enumeration
 			}
