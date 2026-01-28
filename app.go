@@ -80,9 +80,10 @@ func RunApp() {
 	buildTrayMenu()
 
 	watching = true
-	go watchClipboardAuto()
 
-	showBalloon("Tarkov Screenshoter "+CurrentVersion, "Auto-capture active! Screenshots are auto-batched (20s window).")
+	// Use hotkey-based capture (registers and watches on same thread)
+	go WatchHotkey()
+	showBalloon("Tarkov Screenshoter "+CurrentVersion, "Press Print Screen to capture! Screenshots are auto-batched (20s window).")
 
 	mainWindow.Run()
 }
@@ -122,7 +123,7 @@ func captureAndBatch() {
 		}
 	}()
 
-	// Check if Tarkov is running
+	// Check if Tarkov is running (outside of lock)
 	tarkovRunning := IsTarkovRunning()
 	fmt.Printf("[AUTO] Tarkov running: %v\n", tarkovRunning)
 	if !tarkovRunning {
@@ -130,11 +131,7 @@ func captureAndBatch() {
 		return
 	}
 
-	batchMutex.Lock()
-
-	isUploading := batchUploading
-	batchMutex.Unlock() // Unlock early to get image without holding lock
-
+	// Get image from clipboard (outside of lock - clipboard has its own lock)
 	img, err := GetClipboardImage()
 	if err != nil || img == nil {
 		fmt.Println("[AUTO] No image in clipboard (text/other)")
@@ -161,9 +158,11 @@ func captureAndBatch() {
 		return
 	}
 
-	// Add to pending queue if uploading, otherwise add to batch
+	// Now lock to add to batch or pending queue
 	batchMutex.Lock()
-	if isUploading {
+
+	// Add to pending queue if uploading, otherwise add to batch
+	if batchUploading {
 		pendingImages = append(pendingImages, img)
 		count := len(pendingImages)
 		fmt.Printf("[PENDING] Image %d added to pending queue (upload in progress)\n", count)
@@ -325,6 +324,7 @@ func buildTrayMenu() {
 	exitAction.SetText("Exit")
 	exitAction.Triggered().Attach(func() {
 		watching = false
+		UnregisterScreenshotHotkey()
 		walk.App().Exit(0)
 	})
 	notifyIcon.ContextMenu().Actions().Add(exitAction)
