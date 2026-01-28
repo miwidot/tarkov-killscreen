@@ -158,6 +158,17 @@ func addToBatch(img image.Image) {
 		return
 	}
 
+	// Check for re-capture (screenshot of a screenshot with our signature)
+	if HasSignature(img) {
+		fmt.Println("[CAPTURE] Re-capture detected! Ignoring...")
+		showWarning("Re-Capture Detected", "This appears to be a screenshot of a screenshot. Ignored.")
+		return
+	}
+
+	// Embed our signature
+	signedImg := EmbedSignature(img)
+	img = signedImg // Use signed image from here
+
 	// Check aspect ratio
 	aspectRatio := float64(width) / float64(height)
 	if !isValidAspectRatio(aspectRatio) {

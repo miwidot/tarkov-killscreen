@@ -231,6 +231,23 @@ func processBatch() {
 		return
 	}
 
+	// Verify all images have our signature (safety check)
+	validImages := make([]image.Image, 0, len(images))
+	for i, img := range images {
+		if VerifySignature(img) {
+			validImages = append(validImages, img)
+		} else {
+			fmt.Printf("[BATCH] Image %d failed signature check, skipping\n", i+1)
+		}
+	}
+
+	if len(validImages) == 0 {
+		fmt.Println("[BATCH] No valid images to upload")
+		showWarning("Upload Failed", "No valid screenshots to upload")
+		return
+	}
+
+	images = validImages
 	fmt.Printf("[BATCH] Processing %d images...\n", len(images))
 	showBalloon("Processing", fmt.Sprintf("Uploading %d screenshot(s)...", len(images)))
 
