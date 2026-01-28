@@ -48,6 +48,9 @@ func generateSignatureHash(width, height int) []byte {
 	return result
 }
 
+// Tolerance for JPEG compression and display rendering artifacts
+const signatureTolerance = 8
+
 // HasSignature checks if an image already has our signature (re-capture detection)
 func HasSignature(img image.Image) bool {
 	bounds := img.Bounds()
@@ -60,7 +63,8 @@ func HasSignature(img image.Image) bool {
 
 	positions := getSignaturePositions(width, height)
 
-	// Read magic bytes from first 4 positions
+	// Read magic bytes from first 4 positions (with tolerance for JPEG artifacts)
+	matches := 0
 	for i := 0; i < 4; i++ {
 		pos := positions[i]
 		x := bounds.Min.X + pos.X
@@ -72,14 +76,29 @@ func HasSignature(img image.Image) bool {
 
 		_, _, b, _ := img.At(x, y).RGBA()
 		blueValue := byte(b >> 8)
+		expected := signatureMagic[i]
 
-		if blueValue != signatureMagic[i] {
-			return false
+		// Check with tolerance (JPEG compression changes values slightly)
+		diff := int(blueValue) - int(expected)
+		if diff < 0 {
+			diff = -diff
+		}
+
+		if diff <= signatureTolerance {
+			matches++
+			fmt.Printf("[SIGNATURE] Pos %d: expected 0x%02X, got 0x%02X (diff=%d) ✓\n", i, expected, blueValue, diff)
+		} else {
+			fmt.Printf("[SIGNATURE] Pos %d: expected 0x%02X, got 0x%02X (diff=%d) ✗\n", i, expected, blueValue, diff)
 		}
 	}
 
-	fmt.Println("[SIGNATURE] Magic bytes found - this is a re-capture!")
-	return true
+	// Need at least 3 of 4 magic bytes to match (allows for some corruption)
+	if matches >= 3 {
+		fmt.Printf("[SIGNATURE] Re-capture detected! (%d/4 magic bytes matched)\n", matches)
+		return true
+	}
+
+	return false
 }
 
 // EmbedSignature adds our signature to the image
