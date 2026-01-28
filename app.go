@@ -2,14 +2,10 @@
 //
 // This file contains the core application logic:
 // - System tray icon and menu
-// - Clipboard monitoring loop
+// - Hotkey-based screenshot capture
 // - Auto-batching of multiple screenshots (20 second window)
-// - Image validation (size, aspect ratio, duplicates)
+// - Image validation (size, aspect ratio)
 // - Coordination of upload and notifications
-//
-// The clipboard watcher runs in a background goroutine, polling the
-// clipboard sequence number every 500ms. When it changes and contains
-// an image, we capture it and add it to the current batch.
 //
 // Auto-batching allows users to take multiple screenshots of a scrollable
 // kill list. After 20 seconds of no new screenshots, all images in the
@@ -20,7 +16,6 @@ import (
 	"fmt"
 	"image"
 	"os"
-	"os/exec"
 	"sync"
 	"time"
 
@@ -333,13 +328,6 @@ func buildTrayMenu() {
 	})
 	notifyIcon.ContextMenu().Actions().Add(processNowAction)
 
-	openFolderAction := walk.NewAction()
-	openFolderAction.SetText("Open Screenshots Folder")
-	openFolderAction.Triggered().Attach(func() {
-		openExplorer(config.ScreenshotPath)
-	})
-	notifyIcon.ContextMenu().Actions().Add(openFolderAction)
-
 	settingsAction := walk.NewAction()
 	settingsAction.SetText("Settings...")
 	settingsAction.Triggered().Attach(func() {
@@ -389,10 +377,6 @@ func showWarning(title, message string) {
 	if notifyIcon != nil {
 		notifyIcon.ShowWarning(title, message)
 	}
-}
-
-func openExplorer(path string) {
-	exec.Command("explorer", path).Start()
 }
 
 // isValidAspectRatio checks if the aspect ratio is reasonable for a game screenshot

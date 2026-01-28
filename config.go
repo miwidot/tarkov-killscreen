@@ -2,9 +2,8 @@
 //
 // This file manages the application configuration stored in config.json.
 // The config file is stored next to the executable and contains:
-// - Screenshot save path
+// - Hotkey settings
 // - API URL and settings
-// - JPEG quality settings
 //
 // Note: The API token is NOT stored in this file for security reasons.
 // It is stored separately in Windows Credential Manager (see credential.go).
@@ -29,15 +28,11 @@ type APIConfig struct {
 }
 
 type Config struct {
-	ScreenshotPath string       `json:"screenshot_path"`
-	FilenameFormat string       `json:"filename_format"`
-	Hotkeys        HotkeyConfig `json:"hotkeys"`
-	API            APIConfig    `json:"api"`
+	Hotkeys HotkeyConfig `json:"hotkeys"`
+	API     APIConfig    `json:"api"`
 }
 
 var defaultConfig = Config{
-	ScreenshotPath: "",
-	FilenameFormat: "screenshot_2006-01-02_15-04-05",
 	Hotkeys: HotkeyConfig{
 		CaptureKey: "PrintScreen",
 	},
@@ -63,7 +58,6 @@ func LoadConfig() (*Config, error) {
 		if os.IsNotExist(err) {
 			// Create default config
 			cfg := defaultConfig
-			cfg.ScreenshotPath = getDefaultScreenshotPath()
 			SaveConfig(&cfg)
 			return &cfg, nil
 		}
@@ -84,11 +78,4 @@ func SaveConfig(cfg *Config) error {
 		return err
 	}
 	return os.WriteFile(getConfigPath(), data, 0644)
-}
-
-func getDefaultScreenshotPath() string {
-	home, _ := os.UserHomeDir()
-	path := filepath.Join(home, "Pictures", "Screenshots")
-	os.MkdirAll(path, 0755)
-	return path
 }
