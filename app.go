@@ -250,17 +250,17 @@ func processBatch() {
 	}
 
 	if resp != nil && resp.Success {
+		summary := FormatKillSummary(resp)
+
+		// Check if some images were invalid (but we may still have valid kills)
 		if !IsValidTarkovScreenshot(resp) {
-			reason := FormatKillSummary(resp)
-			fmt.Println("[BATCH] Invalid images:", reason)
-			showWarning("Not Tarkov Screenshots", reason)
-			return
+			fmt.Println("[BATCH] Some images invalid, checking for valid kills...")
 		}
 
-		summary := FormatKillSummary(resp)
-		fmt.Println("[BATCH] Success:", summary)
+		fmt.Println("[BATCH] Result:", summary)
 
 		if resp.Data.TotalKills > 0 {
+			// Save kills even if some images were invalid - server filters invalid ones
 			saveResp, err := SaveKills(resp, config)
 			if err != nil {
 				fmt.Println("[BATCH] Save error:", err)
@@ -269,6 +269,10 @@ func processBatch() {
 				fmt.Println("[BATCH] Saved! RaidID:", saveResp.RaidID)
 				showBalloon("Kills Saved!", summary)
 			}
+		} else if !IsValidTarkovScreenshot(resp) {
+			// No kills and invalid images - warn user
+			reason := FormatKillSummary(resp)
+			showWarning("Not Tarkov Screenshots", reason)
 		} else {
 			showBalloon("Analysis Complete", summary)
 		}
