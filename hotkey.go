@@ -16,10 +16,44 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/png"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/kbinani/screenshot"
 )
+
+// DebugSaveScreenshot saves screenshot to debug folder for inspection
+var DebugSaveScreenshots = true // Set to false in production
+
+func debugSaveScreenshot(img image.Image, suffix string) {
+	if !DebugSaveScreenshots {
+		return
+	}
+
+	// Save to exe directory / debug folder
+	exe, _ := os.Executable()
+	debugDir := filepath.Join(filepath.Dir(exe), "debug")
+	os.MkdirAll(debugDir, 0755)
+
+	filename := fmt.Sprintf("capture_%s_%s.png", time.Now().Format("2006-01-02_15-04-05"), suffix)
+	filepath := filepath.Join(debugDir, filename)
+
+	file, err := os.Create(filepath)
+	if err != nil {
+		fmt.Printf("[DEBUG] Failed to create file: %v\n", err)
+		return
+	}
+	defer file.Close()
+
+	if err := png.Encode(file, img); err != nil {
+		fmt.Printf("[DEBUG] Failed to encode PNG: %v\n", err)
+		return
+	}
+
+	fmt.Printf("[DEBUG] Saved: %s\n", filepath)
+}
 
 var (
 	procGetAsyncKeyState = user32.NewProc("GetAsyncKeyState")
@@ -149,6 +183,9 @@ func captureScreen() {
 	}
 
 	fmt.Printf("[CAPTURE] Got image %dx%d\n", img.Bounds().Dx(), img.Bounds().Dy())
+
+	// Debug: Save raw capture for inspection
+	debugSaveScreenshot(img, "raw")
 
 	// Add to batch for processing
 	addToBatch(img)

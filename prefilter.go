@@ -39,7 +39,7 @@ func PrefilterScreenshot(img image.Image) PrefilterResult {
 	stripeScore := calculateStripeScore(img, startX, startY, endX, endY)
 
 	// Thresholds (tuned for Tarkov kill screens)
-	edgeThreshold := 0.03      // Kill screens typically have 3-8% edge density
+	edgeThreshold := 0.015     // Kill screens typically have 1.5-8% edge density
 	stripeThreshold := 0.15    // Stripe alternation score
 
 	isLikely := edgeDensity >= edgeThreshold && stripeScore >= stripeThreshold
