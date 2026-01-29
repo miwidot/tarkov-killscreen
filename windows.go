@@ -186,35 +186,33 @@ func GetTarkovDisplayIndex() int {
 		return 0
 	}
 
-	// Get window rect
-	var rect RECT
-	ret2, _, _ := procGetWindowRect.Call(tarkovHwnd, uintptr(unsafe.Pointer(&rect)))
+	// Use MonitorFromWindow - works for windowed, borderless, and fullscreen
+	hMonitor, _, _ := procMonitorFromWindow.Call(tarkovHwnd, MONITOR_DEFAULTTONEAREST)
+	if hMonitor == 0 {
+		return 0
+	}
+
+	// Get monitor info
+	var mi MONITORINFO
+	mi.Size = uint32(unsafe.Sizeof(mi))
+	ret2, _, _ := procGetMonitorInfoW.Call(hMonitor, uintptr(unsafe.Pointer(&mi)))
 	if ret2 == 0 {
 		return 0
 	}
 
-	// Calculate window center
-	centerX := (rect.Left + rect.Right) / 2
-	centerY := (rect.Top + rect.Bottom) / 2
+	fmt.Printf("[TARKOV] Monitor: (%d,%d)-(%d,%d)\n",
+		mi.Monitor.Left, mi.Monitor.Top, mi.Monitor.Right, mi.Monitor.Bottom)
 
-	fmt.Printf("[TARKOV] Window at (%d,%d)-(%d,%d), center: (%d,%d)\n",
-		rect.Left, rect.Top, rect.Right, rect.Bottom, centerX, centerY)
-
-	// Find which display contains this point
-	// We'll use the screenshot library's display bounds
-	return findDisplayAtPoint(int(centerX), int(centerY))
-}
-
-// findDisplayAtPoint returns the display index containing the given point
-func findDisplayAtPoint(x, y int) int {
+	// Match monitor rect to screenshot library display index
 	n := getNumDisplays()
 	for i := 0; i < n; i++ {
 		bounds := getDisplayBounds(i)
-		if x >= int(bounds.Left) && x < int(bounds.Right) && y >= int(bounds.Top) && y < int(bounds.Bottom) {
-			fmt.Printf("[TARKOV] Found on display %d\n", i)
+		if bounds.Left == mi.Monitor.Left && bounds.Top == mi.Monitor.Top {
+			fmt.Printf("[TARKOV] Matched to display %d\n", i)
 			return i
 		}
 	}
+
 	return 0 // Default to primary
 }
 
