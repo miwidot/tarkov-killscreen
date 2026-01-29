@@ -140,9 +140,10 @@ func IsTarkovRunning() bool {
 // Returns the display index (0-based) or -1 if not found
 func GetTarkovDisplayIndex() int {
 	var tarkovHwnd uintptr
-	var tarkovPid uint32
 
-	// First, find the Tarkov process ID
+	// Collect ALL Tarkov process IDs (BE launcher + actual game have different PIDs)
+	var tarkovPids []uint32
+
 	snapshot, _, _ := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
 	if snapshot == 0 || snapshot == ^uintptr(0) {
 		return -1
@@ -155,26 +156,29 @@ func GetTarkovDisplayIndex() int {
 	for ret != 0 {
 		exeName := strings.ToLower(syscall.UTF16ToString(entry.ExeFile[:]))
 		if strings.Contains(exeName, "escapefromtarkov") {
-			tarkovPid = entry.ProcessID
-			break
+			fmt.Printf("[TARKOV] Found PID %d: %s\n", entry.ProcessID, exeName)
+			tarkovPids = append(tarkovPids, entry.ProcessID)
 		}
 		ret, _, _ = procProcess32NextW.Call(snapshot, uintptr(unsafe.Pointer(&entry)))
 	}
 	procCloseHandle.Call(snapshot)
 
-	if tarkovPid == 0 {
+	if len(tarkovPids) == 0 {
 		return -1
 	}
 
-	// Find the window belonging to Tarkov
+	// Find a visible window belonging to any Tarkov process
 	callback := syscall.NewCallback(func(hwnd uintptr, lParam uintptr) uintptr {
 		var pid uint32
 		procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
-		if pid == tarkovPid {
-			visible, _, _ := procIsWindowVisible.Call(hwnd)
-			if visible != 0 {
-				tarkovHwnd = hwnd
-				return 0 // Stop enumeration
+		for _, tarkovPid := range tarkovPids {
+			if pid == tarkovPid {
+				visible, _, _ := procIsWindowVisible.Call(hwnd)
+				if visible != 0 {
+					tarkovHwnd = hwnd
+					fmt.Printf("[TARKOV] Found window for PID %d\n", pid)
+					return 0 // Stop enumeration
+				}
 			}
 		}
 		return 1 // Continue
