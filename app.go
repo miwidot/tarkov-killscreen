@@ -341,6 +341,7 @@ func buildTrayMenu() {
 	exitAction.SetText("Exit")
 	exitAction.Triggered().Attach(func() {
 		watching = false
+		unregisterGlobalHotkey()
 		walk.App().Exit(0)
 	})
 	notifyIcon.ContextMenu().Actions().Add(exitAction)

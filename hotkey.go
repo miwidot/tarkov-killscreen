@@ -72,9 +72,37 @@ func debugSaveScreenshot(img image.Image, suffix string) {
 }
 
 var (
-	procGetAsyncKeyState = user32.NewProc("GetAsyncKeyState")
-	currentHotkey        uintptr = VK_SNAPSHOT // Default to Print Screen
+	procGetAsyncKeyState  = user32.NewProc("GetAsyncKeyState")
+	procRegisterHotKey    = user32.NewProc("RegisterHotKey")
+	procUnregisterHotKey  = user32.NewProc("UnregisterHotKey")
+	currentHotkey         uintptr = VK_SNAPSHOT // Default to Print Screen
+	hotkeyRegistered      bool
 )
+
+const hotkeyID = 1 // ID for RegisterHotKey
+
+// registerGlobalHotkey uses RegisterHotKey to claim Print Screen globally.
+// This prevents Windows 11 Snipping Tool from hijacking the key.
+func registerGlobalHotkey(vk uintptr) {
+	unregisterGlobalHotkey()
+	if vk == VK_SNAPSHOT {
+		ret, _, err := procRegisterHotKey.Call(0, hotkeyID, 0, vk)
+		if ret != 0 {
+			hotkeyRegistered = true
+			fmt.Printf("[HOTKEY] Registered PrintScreen globally (Snipping Tool blocked)\n")
+		} else {
+			fmt.Printf("[HOTKEY] Failed to register PrintScreen: %v\n", err)
+		}
+	}
+}
+
+func unregisterGlobalHotkey() {
+	if hotkeyRegistered {
+		procUnregisterHotKey.Call(0, hotkeyID)
+		hotkeyRegistered = false
+		fmt.Println("[HOTKEY] Unregistered global hotkey")
+	}
+}
 
 // Virtual key codes
 const (
@@ -114,6 +142,7 @@ var hotkeyToVK = map[string]uintptr{
 func SetHotkey(keyName string) {
 	if vk, ok := hotkeyToVK[keyName]; ok {
 		currentHotkey = vk
+		registerGlobalHotkey(vk)
 		fmt.Printf("[HOTKEY] Set capture key to: %s (0x%02X)\n", keyName, vk)
 	}
 }
@@ -121,6 +150,7 @@ func SetHotkey(keyName string) {
 // WatchHotkey polls for configured hotkey press
 func WatchHotkey() {
 	keyName := GetHotkeyName(currentHotkey)
+	registerGlobalHotkey(currentHotkey)
 	fmt.Printf("[HOTKEY] Watching for %s key (polling)...\n", keyName)
 
 	var lastState int16 = 0

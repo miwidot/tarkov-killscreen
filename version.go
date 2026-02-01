@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	CurrentVersion = "alpha7"
+	CurrentVersion = "alpha8"
 	GithubRepo     = "miwidot/tarkov-killscreen"
 )
 
