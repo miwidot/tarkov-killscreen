@@ -69,6 +69,20 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
+	// Apply defaults for missing/zero values (old configs may not have these fields)
+	if cfg.API.MaxWidth == 0 {
+		cfg.API.MaxWidth = defaultConfig.API.MaxWidth
+	}
+	if cfg.API.JPEGQuality == 0 {
+		cfg.API.JPEGQuality = defaultConfig.API.JPEGQuality
+	}
+	if cfg.API.URL == "" {
+		cfg.API.URL = defaultConfig.API.URL
+	}
+	if cfg.API.Mode == "" {
+		cfg.API.Mode = defaultConfig.API.Mode
+	}
+
 	return &cfg, nil
 }
 
