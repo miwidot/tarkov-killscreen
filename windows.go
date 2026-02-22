@@ -17,7 +17,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -85,18 +84,18 @@ func IsAlreadyRunning() bool {
 	handle, _, err := procCreateMutexW.Call(0, 1, uintptr(unsafe.Pointer(mutexName)))
 
 	if handle == 0 {
-		fmt.Println("[MUTEX] Failed to create mutex")
+		debugLn("[MUTEX] Failed to create mutex")
 		return true // Failed to create mutex
 	}
 
 	// In Go syscall, the error code is in err (as syscall.Errno)
 	if errno, ok := err.(syscall.Errno); ok && errno == ERROR_ALREADY_EXISTS {
-		fmt.Println("[MUTEX] Another instance is already running")
+		debugLn("[MUTEX] Another instance is already running")
 		procCloseHandle.Call(handle)
 		return true
 	}
 
-	fmt.Println("[MUTEX] This is the first instance")
+	debugLn("[MUTEX] This is the first instance")
 	// Keep the mutex handle open - it will be released when the app exits
 	return false
 }
@@ -105,7 +104,7 @@ func IsAlreadyRunning() bool {
 func IsTarkovRunning() bool {
 	snapshot, _, err := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
 	if snapshot == 0 || snapshot == ^uintptr(0) {
-		fmt.Printf("[TARKOV] Snapshot failed: %v\n", err)
+		debugLog("[TARKOV] Snapshot failed: %v\n", err)
 		return false
 	}
 	defer procCloseHandle.Call(snapshot)
@@ -123,7 +122,7 @@ func IsTarkovRunning() bool {
 		// Check for Tarkov - also check partial match in case of different naming
 		if strings.EqualFold(exeName, "EscapeFromTarkov.exe") ||
 			strings.Contains(strings.ToLower(exeName), "escapefromtarkov") {
-			fmt.Printf("[TARKOV] Found: %s\n", exeName)
+			debugLog("[TARKOV] Found: %s\n", exeName)
 			return true
 		}
 
@@ -156,7 +155,7 @@ func GetTarkovDisplayIndex() int {
 	for ret != 0 {
 		exeName := strings.ToLower(syscall.UTF16ToString(entry.ExeFile[:]))
 		if strings.Contains(exeName, "escapefromtarkov") {
-			fmt.Printf("[TARKOV] Found PID %d: %s\n", entry.ProcessID, exeName)
+			debugLog("[TARKOV] Found PID %d: %s\n", entry.ProcessID, exeName)
 			tarkovPids = append(tarkovPids, entry.ProcessID)
 		}
 		ret, _, _ = procProcess32NextW.Call(snapshot, uintptr(unsafe.Pointer(&entry)))
@@ -176,7 +175,7 @@ func GetTarkovDisplayIndex() int {
 				visible, _, _ := procIsWindowVisible.Call(hwnd)
 				if visible != 0 {
 					tarkovHwnd = hwnd
-					fmt.Printf("[TARKOV] Found window for PID %d\n", pid)
+					debugLog("[TARKOV] Found window for PID %d\n", pid)
 					return 0 // Stop enumeration
 				}
 			}
@@ -186,7 +185,7 @@ func GetTarkovDisplayIndex() int {
 	procEnumWindows.Call(callback, 0)
 
 	if tarkovHwnd == 0 {
-		fmt.Println("[TARKOV] Window not found, using display 0")
+		debugLn("[TARKOV] Window not found, using display 0")
 		return 0
 	}
 
@@ -204,7 +203,7 @@ func GetTarkovDisplayIndex() int {
 		return 0
 	}
 
-	fmt.Printf("[TARKOV] Monitor: (%d,%d)-(%d,%d)\n",
+	debugLog("[TARKOV] Monitor: (%d,%d)-(%d,%d)\n",
 		mi.Monitor.Left, mi.Monitor.Top, mi.Monitor.Right, mi.Monitor.Bottom)
 
 	// Match monitor rect to screenshot library display index
@@ -212,7 +211,7 @@ func GetTarkovDisplayIndex() int {
 	for i := 0; i < n; i++ {
 		bounds := getDisplayBounds(i)
 		if bounds.Left == mi.Monitor.Left && bounds.Top == mi.Monitor.Top {
-			fmt.Printf("[TARKOV] Matched to display %d\n", i)
+			debugLog("[TARKOV] Matched to display %d\n", i)
 			return i
 		}
 	}
@@ -327,7 +326,7 @@ func processHasVisibleWindow(processID uint32) bool {
 func IsImageViewerRunning() (bool, string) {
 	snapshot, _, err := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
 	if snapshot == 0 || snapshot == ^uintptr(0) {
-		fmt.Printf("[VIEWER] Snapshot failed: %v\n", err)
+		debugLog("[VIEWER] Snapshot failed: %v\n", err)
 		return false, ""
 	}
 	defer procCloseHandle.Call(snapshot)

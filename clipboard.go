@@ -17,7 +17,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"time"
 	"unsafe"
@@ -81,13 +80,13 @@ type clipboardData struct {
 func copyClipboardData() *clipboardData {
 	ret, _, _ := procOpenClipboard.Call(0)
 	if ret == 0 {
-		fmt.Println("[CLIPBOARD] Failed to open")
+		debugLn("[CLIPBOARD] Failed to open")
 		return nil
 	}
 	// IMPORTANT: Close clipboard as soon as possible!
 	defer func() {
 		procCloseClipboard.Call()
-		fmt.Println("[CLIPBOARD] Closed")
+		debugLn("[CLIPBOARD] Closed")
 	}()
 
 	// Try formats in order of preference: DIBV5 (modern), DIB (legacy)
@@ -115,15 +114,15 @@ func copyClipboardData() *clipboardData {
 	}
 
 	if hMem == 0 {
-		fmt.Println("[CLIPBOARD] No image format available")
+		debugLn("[CLIPBOARD] No image format available")
 		return nil
 	}
 
-	fmt.Printf("[CLIPBOARD] Using format: %s\n", formatUsed)
+	debugLog("[CLIPBOARD] Using format: %s\n", formatUsed)
 
 	ptr, _, _ := procGlobalLock.Call(hMem)
 	if ptr == 0 {
-		fmt.Println("[CLIPBOARD] GlobalLock failed")
+		debugLn("[CLIPBOARD] GlobalLock failed")
 		return nil
 	}
 	defer procGlobalUnlock.Call(hMem)
@@ -131,7 +130,7 @@ func copyClipboardData() *clipboardData {
 	// Get size of memory block
 	size, _, _ := procGlobalSize.Call(hMem)
 	if size == 0 {
-		fmt.Println("[CLIPBOARD] GlobalSize returned 0")
+		debugLn("[CLIPBOARD] GlobalSize returned 0")
 		return nil
 	}
 
@@ -145,7 +144,7 @@ func copyClipboardData() *clipboardData {
 
 	bitCount := int(header.BitCount)
 	if bitCount != 24 && bitCount != 32 {
-		fmt.Printf("[CLIPBOARD] Unsupported bitCount: %d\n", bitCount)
+		debugLog("[CLIPBOARD] Unsupported bitCount: %d\n", bitCount)
 		return nil
 	}
 
@@ -184,12 +183,12 @@ func GetClipboardImage() (*image.RGBA, error) {
 		data = copyClipboardData()
 		if data != nil {
 			if attempt > 0 {
-				fmt.Printf("[CLIPBOARD] Got data on attempt %d\n", attempt+1)
+				debugLog("[CLIPBOARD] Got data on attempt %d\n", attempt+1)
 			}
 			break
 		}
 		if attempt < 4 {
-			fmt.Printf("[CLIPBOARD] Retry %d/5...\n", attempt+1)
+			debugLog("[CLIPBOARD] Retry %d/5...\n", attempt+1)
 			time.Sleep(100 * time.Millisecond)
 		}
 	}

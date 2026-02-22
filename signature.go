@@ -9,7 +9,6 @@ package main
 
 import (
 	"encoding/binary"
-	"fmt"
 	"hash/crc32"
 	"image"
 	"image/color"
@@ -86,15 +85,15 @@ func HasSignature(img image.Image) bool {
 
 		if diff <= signatureTolerance {
 			matches++
-			fmt.Printf("[SIGNATURE] Pos %d: expected 0x%02X, got 0x%02X (diff=%d) ✓\n", i, expected, blueValue, diff)
+			debugLog("[SIGNATURE] Pos %d: expected 0x%02X, got 0x%02X (diff=%d) ✓\n", i, expected, blueValue, diff)
 		} else {
-			fmt.Printf("[SIGNATURE] Pos %d: expected 0x%02X, got 0x%02X (diff=%d) ✗\n", i, expected, blueValue, diff)
+			debugLog("[SIGNATURE] Pos %d: expected 0x%02X, got 0x%02X (diff=%d) ✗\n", i, expected, blueValue, diff)
 		}
 	}
 
 	// Need at least 3 of 4 magic bytes to match (allows for some corruption)
 	if matches >= 3 {
-		fmt.Printf("[SIGNATURE] Re-capture detected! (%d/4 magic bytes matched)\n", matches)
+		debugLog("[SIGNATURE] Re-capture detected! (%d/4 magic bytes matched)\n", matches)
 		return true
 	}
 
@@ -144,7 +143,7 @@ func EmbedSignature(img image.Image) *image.RGBA {
 		rgba.Set(x, y, newColor)
 	}
 
-	fmt.Printf("[SIGNATURE] Embedded signature at y=%d\n", height-3)
+	debugLog("[SIGNATURE] Embedded signature at y=%d\n", height-3)
 	return rgba
 }
 
@@ -174,7 +173,7 @@ func VerifySignature(img image.Image) bool {
 		blueValue := byte(b >> 8)
 
 		if blueValue != signatureMagic[i] {
-			fmt.Printf("[SIGNATURE] Verify failed at pos %d: expected 0x%02X, got 0x%02X\n",
+			debugLog("[SIGNATURE] Verify failed at pos %d: expected 0x%02X, got 0x%02X\n",
 				i, signatureMagic[i], blueValue)
 			return false
 		}

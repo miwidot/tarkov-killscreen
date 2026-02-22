@@ -41,7 +41,7 @@ func StartUpdateChecker() {
 	ticker := time.NewTicker(30 * time.Minute)
 	go func() {
 		for range ticker.C {
-			fmt.Println("[UPDATE] Periodic check...")
+			debugLn("[UPDATE] Periodic check...")
 			CheckForUpdates()
 		}
 	}()
@@ -53,23 +53,23 @@ func CheckForUpdates() {
 
 	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println("[UPDATE] Failed to check for updates:", err)
+		debugLn("[UPDATE] Failed to check for updates:", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Println("[UPDATE] GitHub API returned:", resp.StatusCode)
+		debugLn("[UPDATE] GitHub API returned:", resp.StatusCode)
 		return
 	}
 
 	var release GithubRelease
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		fmt.Println("[UPDATE] Failed to parse response:", err)
+		debugLn("[UPDATE] Failed to parse response:", err)
 		return
 	}
 
-	fmt.Printf("[UPDATE] Current: %s, Latest: %s\n", CurrentVersion, release.TagName)
+	debugLog("[UPDATE] Current: %s, Latest: %s\n", CurrentVersion, release.TagName)
 
 	if isNewerVersion(release.TagName, CurrentVersion) {
 		showUpdateDialog(release)

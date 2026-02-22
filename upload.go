@@ -175,8 +175,8 @@ func UploadScreenshot(img image.Image, cfg *Config) (*OCRResponse, error) {
 	// Trim any whitespace that might have been added
 	token = strings.TrimSpace(token)
 
-	fmt.Printf("[UPLOAD] Token length: %d, first 4: %s, last 4: %s\n", len(token), token[:4], token[len(token)-4:])
-	fmt.Printf("[UPLOAD] URL: %s, Mode: %s\n", cfg.API.URL, cfg.API.Mode)
+	debugLog("[UPLOAD] Token length: %d, first 4: %s, last 4: %s\n", len(token), token[:4], token[len(token)-4:])
+	debugLog("[UPLOAD] URL: %s, Mode: %s\n", cfg.API.URL, cfg.API.Mode)
 
 	// Compress image
 	imageData, err := compressImage(img, cfg)
@@ -213,7 +213,7 @@ func UploadScreenshot(img image.Image, cfg *Config) (*OCRResponse, error) {
 	authHeader := "Bearer " + token
 	req.Header.Set("Authorization", authHeader)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	fmt.Printf("[UPLOAD] Auth header: Bearer %s...%s\n", token[:4], token[len(token)-4:])
+	debugLog("[UPLOAD] Auth header: Bearer %s...%s\n", token[:4], token[len(token)-4:])
 
 	// Send request with timeout
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -229,8 +229,8 @@ func UploadScreenshot(img image.Image, cfg *Config) (*OCRResponse, error) {
 		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
 
-	fmt.Printf("[UPLOAD] Response status: %d\n", resp.StatusCode)
-	fmt.Printf("[UPLOAD] Response body: %s\n", string(respBody))
+	debugLog("[UPLOAD] Response status: %d\n", resp.StatusCode)
+	debugLog("[UPLOAD] Response body: %s\n", string(respBody))
 
 	// Parse response
 	var ocrResp OCRResponse
@@ -265,7 +265,7 @@ func UploadMultipleScreenshots(images []image.Image, cfg *Config) (*OCRResponse,
 	}
 	token = strings.TrimSpace(token)
 
-	fmt.Printf("[UPLOAD] Uploading %d images...\n", len(images))
+	fmt.Printf("[UPLOAD] Uploading %d images...\n", len(images)) // User-facing status
 
 	// Create multipart form
 	var body bytes.Buffer
@@ -315,8 +315,8 @@ func UploadMultipleScreenshots(images []image.Image, cfg *Config) (*OCRResponse,
 		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
 
-	fmt.Printf("[UPLOAD] Response status: %d\n", resp.StatusCode)
-	fmt.Printf("[UPLOAD] Response body: %s\n", string(respBody))
+	debugLog("[UPLOAD] Response status: %d\n", resp.StatusCode)
+	debugLog("[UPLOAD] Response body: %s\n", string(respBody))
 
 	var ocrResp OCRResponse
 	if err := json.Unmarshal(respBody, &ocrResp); err != nil {
@@ -421,7 +421,7 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 		return nil, fmt.Errorf("failed to marshal save request: %v", err)
 	}
 
-	fmt.Printf("[SAVE] Saving %d kills to database...\n", ocrResp.Data.TotalKills)
+	fmt.Printf("[SAVE] Saving %d kills...\n", ocrResp.Data.TotalKills) // User-facing status
 
 	// Build save URL (replace /api/ocr with /api/kills/save)
 	saveURL := strings.Replace(cfg.API.URL, "/api/ocr", "/api/kills/save", 1)
@@ -446,8 +446,8 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 		return nil, fmt.Errorf("failed to read save response: %v", err)
 	}
 
-	fmt.Printf("[SAVE] Response status: %d\n", resp.StatusCode)
-	fmt.Printf("[SAVE] Response body: %s\n", string(respBody))
+	debugLog("[SAVE] Response status: %d\n", resp.StatusCode)
+	debugLog("[SAVE] Response body: %s\n", string(respBody))
 
 	var saveResp SaveKillsResponse
 	if err := json.Unmarshal(respBody, &saveResp); err != nil {
@@ -461,6 +461,6 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 		return nil, fmt.Errorf("save failed: %d", resp.StatusCode)
 	}
 
-	fmt.Printf("[SAVE] Saved! RaidID: %s\n", saveResp.RaidID)
+	fmt.Printf("[SAVE] Saved! RaidID: %s\n", saveResp.RaidID) // User-facing success
 	return &saveResp, nil
 }

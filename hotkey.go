@@ -25,7 +25,7 @@ import (
 )
 
 // DebugSaveScreenshot saves screenshot to debug folder for inspection
-var DebugSaveScreenshots = true // Set to false in production
+var DebugSaveScreenshots = debugMode
 
 func init() {
 	// Set up display helper functions to avoid import cycle
@@ -58,17 +58,17 @@ func debugSaveScreenshot(img image.Image, suffix string) {
 
 	file, err := os.Create(filepath)
 	if err != nil {
-		fmt.Printf("[DEBUG] Failed to create file: %v\n", err)
+		debugLog("[DEBUG] Failed to create file: %v\n", err)
 		return
 	}
 	defer file.Close()
 
 	if err := png.Encode(file, img); err != nil {
-		fmt.Printf("[DEBUG] Failed to encode PNG: %v\n", err)
+		debugLog("[DEBUG] Failed to encode PNG: %v\n", err)
 		return
 	}
 
-	fmt.Printf("[DEBUG] Saved: %s\n", filepath)
+	debugLog("[DEBUG] Saved: %s\n", filepath)
 }
 
 var (
@@ -89,9 +89,9 @@ func registerGlobalHotkey(vk uintptr) {
 		ret, _, err := procRegisterHotKey.Call(0, hotkeyID, 0, vk)
 		if ret != 0 {
 			hotkeyRegistered = true
-			fmt.Printf("[HOTKEY] Registered PrintScreen globally (Snipping Tool blocked)\n")
+			debugLn("[HOTKEY] Registered PrintScreen globally (Snipping Tool blocked)")
 		} else {
-			fmt.Printf("[HOTKEY] Failed to register PrintScreen: %v\n", err)
+			debugLog("[HOTKEY] Failed to register PrintScreen: %v\n", err)
 		}
 	}
 }
@@ -100,7 +100,7 @@ func unregisterGlobalHotkey() {
 	if hotkeyRegistered {
 		procUnregisterHotKey.Call(0, hotkeyID)
 		hotkeyRegistered = false
-		fmt.Println("[HOTKEY] Unregistered global hotkey")
+		debugLn("[HOTKEY] Unregistered global hotkey")
 	}
 }
 
@@ -143,7 +143,7 @@ func SetHotkey(keyName string) {
 	if vk, ok := hotkeyToVK[keyName]; ok {
 		currentHotkey = vk
 		registerGlobalHotkey(vk)
-		fmt.Printf("[HOTKEY] Set capture key to: %s (0x%02X)\n", keyName, vk)
+		debugLog("[HOTKEY] Set capture key to: %s\n", keyName)
 	}
 }
 
@@ -151,7 +151,7 @@ func SetHotkey(keyName string) {
 func WatchHotkey() {
 	keyName := GetHotkeyName(currentHotkey)
 	registerGlobalHotkey(currentHotkey)
-	fmt.Printf("[HOTKEY] Watching for %s key (polling)...\n", keyName)
+	debugLog("[HOTKEY] Watching for %s key (polling)...\n", keyName)
 
 	var lastState int16 = 0
 
@@ -167,14 +167,14 @@ func WatchHotkey() {
 		// Detect key press (transition from not pressed to pressed)
 		// High bit set = negative in int16, so state < 0 means key is down
 		if state < 0 && lastState >= 0 {
-			fmt.Printf("[HOTKEY] %s pressed!\n", keyName)
+			debugLog("[HOTKEY] %s pressed!\n", keyName)
 			go captureScreen()
 		}
 
 		lastState = state
 	}
 
-	fmt.Println("[HOTKEY] Watcher stopped!")
+	debugLn("[HOTKEY] Watcher stopped!")
 }
 
 // GetHotkeyName returns the display name for a virtual key code
@@ -194,19 +194,19 @@ func GetHotkeyName(vk uintptr) string {
 func captureScreen() {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("[CAPTURE] PANIC recovered: %v\n", r)
+			fmt.Printf("[CAPTURE] PANIC recovered: %v\n", r) // Always log panics
 		}
 	}()
 
 	// Check if Tarkov is running
 	if !IsTarkovRunning() {
-		fmt.Println("[CAPTURE] Tarkov not running, ignoring")
+		debugLn("[CAPTURE] Tarkov not running, ignoring")
 		return
 	}
 
 	// Check if image viewer is running (re-capture prevention)
 	if isViewer, viewerName := IsImageViewerRunning(); isViewer {
-		fmt.Printf("[CAPTURE] Image viewer detected: %s - blocking to prevent re-capture\n", viewerName)
+		fmt.Printf("[CAPTURE] Image viewer detected: %s - blocking to prevent re-capture\n", viewerName) // User-facing warning
 		showWarning("Capture Blocked", fmt.Sprintf("Close %s first to prevent re-capture", viewerName))
 		return
 	}
@@ -214,7 +214,7 @@ func captureScreen() {
 	// Get the display where Tarkov is running
 	n := screenshot.NumActiveDisplays()
 	if n == 0 {
-		fmt.Println("[CAPTURE] No displays found")
+		fmt.Println("[CAPTURE] No displays found") // User-facing error
 		return
 	}
 
@@ -225,15 +225,15 @@ func captureScreen() {
 	}
 
 	bounds := screenshot.GetDisplayBounds(displayIndex)
-	fmt.Printf("[CAPTURE] Capturing display %d: %dx%d\n", displayIndex, bounds.Dx(), bounds.Dy())
+	debugLog("[CAPTURE] Capturing display %d: %dx%d\n", displayIndex, bounds.Dx(), bounds.Dy())
 
 	img, err := screenshot.CaptureRect(bounds)
 	if err != nil {
-		fmt.Printf("[CAPTURE] Failed to capture: %v\n", err)
+		fmt.Printf("[CAPTURE] Failed to capture: %v\n", err) // User-facing error
 		return
 	}
 
-	fmt.Printf("[CAPTURE] Got image %dx%d\n", img.Bounds().Dx(), img.Bounds().Dy())
+	debugLog("[CAPTURE] Got image %dx%d\n", img.Bounds().Dx(), img.Bounds().Dy())
 
 	// Debug: Save raw capture for inspection
 	debugSaveScreenshot(img, "raw")
@@ -249,13 +249,13 @@ func addToBatch(img image.Image) {
 
 	// Check minimum size
 	if width < 800 || height < 400 {
-		fmt.Printf("[CAPTURE] Image too small (%dx%d)\n", width, height)
+		debugLog("[CAPTURE] Image too small (%dx%d)\n", width, height)
 		return
 	}
 
 	// Check for re-capture (screenshot of a screenshot with our signature)
 	if HasSignature(img) {
-		fmt.Println("[CAPTURE] Re-capture detected! Ignoring...")
+		fmt.Println("[CAPTURE] Re-capture detected! Ignoring...") // User-facing warning
 		showWarning("Re-Capture Detected", "This appears to be a screenshot of a screenshot. Ignored.")
 		return
 	}
@@ -267,7 +267,7 @@ func addToBatch(img image.Image) {
 	// Check aspect ratio
 	aspectRatio := float64(width) / float64(height)
 	if !isValidAspectRatio(aspectRatio) {
-		fmt.Printf("[CAPTURE] Invalid aspect ratio (%.2f)\n", aspectRatio)
+		debugLog("[CAPTURE] Invalid aspect ratio (%.2f)\n", aspectRatio)
 		return
 	}
 
@@ -277,7 +277,7 @@ func addToBatch(img image.Image) {
 	if batchUploading {
 		pendingImages = append(pendingImages, img)
 		count := len(pendingImages)
-		fmt.Printf("[PENDING] Image %d added to pending queue\n", count)
+		debugLog("[PENDING] Image %d added to pending queue\n", count)
 		showBalloon("Screenshot queued", fmt.Sprintf("%d screenshot(s) waiting", count))
 		batchMutex.Unlock()
 		return
@@ -285,7 +285,7 @@ func addToBatch(img image.Image) {
 
 	batchImages = append(batchImages, img)
 	count := len(batchImages)
-	fmt.Printf("[BATCH] Image %d added to batch\n", count)
+	debugLog("[BATCH] Image %d added to batch\n", count)
 
 	if count == 1 {
 		showBalloon("Screenshot captured", "Waiting 20s for more screenshots...")

@@ -40,9 +40,32 @@ var (
 	pendingImages []image.Image
 )
 
+func printBanner() {
+	banner := `
+  ╔══════════════════════════════════════════════════════╗
+  ║                                                      ║
+  ║   ▄▄▄▄▄▄▄  ▄▄▄▄▄▄   ▄▄▄▄▄▄▄  ▄     ▄  ▄▄▄▄▄▄▄    ║
+  ║      █     █      █  █     █  █     █  █     █     ║
+  ║      █     █▄▄▄▄▄▄▀  █▄▄▄▄▄█  █▄▄▄▄▄█  █▄▄▄▄▄█     ║
+  ║      █     █      █  █   █    █     █        █      ║
+  ║      █     █      █  █    █   █     █   ▄▄▄▄▄█      ║
+  ║                                                      ║
+  ║   ─── S T A M M T I S C H  ─────────────────────    ║
+  ║                                                      ║
+  ║        ╔═╗  █ █▀▀ █   █   ▄▀▀ ▄▀▀▄ █ █ █▄ █ ▀█▀   ║
+  ║        ╠╦╝  █▀ █  █   █   █   █  █ █ █ █ ▀█  █    ║
+  ║        ╩╚═  █  ▀▀ ▀▀▀ ▀▀▀  ▀▀ ▀▀▀  ▀▀▀ █  █  ▀    ║
+  ║                                                      ║
+  ╚══════════════════════════════════════════════════════╝`
+
+	fmt.Println(banner)
+	fmt.Printf("  Version: %s\n\n", CurrentVersion)
+}
+
 func RunApp() {
 	var err error
 
+	printBanner()
 	ShowSplash()
 
 	// Check for updates on startup and every 30 minutes
@@ -91,7 +114,7 @@ func RunApp() {
 
 func watchClipboardAuto() {
 	lastSeq := GetClipboardSequenceNumber()
-	fmt.Println("[AUTO] Watching clipboard... seq:", lastSeq)
+	debugLn("[AUTO] Watching clipboard... seq:", lastSeq)
 
 	ticker := 0
 	for watching {
@@ -100,13 +123,13 @@ func watchClipboardAuto() {
 
 		// Heartbeat every 30 seconds
 		if ticker%60 == 0 {
-			fmt.Printf("[AUTO] Heartbeat - still watching, seq: %d\n", lastSeq)
+			debugLog("[AUTO] Heartbeat - still watching, seq: %d\n", lastSeq)
 		}
 
 		currentSeq := GetClipboardSequenceNumber()
 		if currentSeq != lastSeq {
 			lastSeq = currentSeq
-			fmt.Println("[AUTO] Clipboard changed, seq:", currentSeq)
+			debugLn("[AUTO] Clipboard changed, seq:", currentSeq)
 
 			time.Sleep(300 * time.Millisecond)
 
@@ -114,39 +137,39 @@ func watchClipboardAuto() {
 			go captureAndBatch()
 		}
 	}
-	fmt.Println("[AUTO] Watcher stopped!")
+	debugLn("[AUTO] Watcher stopped!")
 }
 
 func captureAndBatch() {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("[AUTO] PANIC recovered: %v\n", r)
+			fmt.Printf("[AUTO] PANIC recovered: %v\n", r) // Always log panics
 		}
 	}()
 
 	// Check if Tarkov is running (outside of lock)
 	tarkovRunning := IsTarkovRunning()
-	fmt.Printf("[AUTO] Tarkov running: %v\n", tarkovRunning)
+	debugLog("[AUTO] Tarkov running: %v\n", tarkovRunning)
 	if !tarkovRunning {
-		fmt.Println("[AUTO] Tarkov not running, ignoring screenshot")
+		debugLn("[AUTO] Tarkov not running, ignoring screenshot")
 		return
 	}
 
 	// Get image from clipboard (outside of lock - clipboard has its own lock)
 	img, err := GetClipboardImage()
 	if err != nil || img == nil {
-		fmt.Println("[AUTO] No image in clipboard (text/other)")
+		debugLn("[AUTO] No image in clipboard (text/other)")
 		return
 	}
 
-	fmt.Printf("[AUTO] Got image %dx%d\n", img.Bounds().Dx(), img.Bounds().Dy())
+	debugLog("[AUTO] Got image %dx%d\n", img.Bounds().Dx(), img.Bounds().Dy())
 
 	width := img.Bounds().Dx()
 	height := img.Bounds().Dy()
 
 	// Check minimum size (server requires 800x400)
 	if width < 800 || height < 400 {
-		fmt.Printf("[AUTO] Image too small (%dx%d), minimum 800x400, skipping...\n", width, height)
+		debugLog("[AUTO] Image too small (%dx%d), minimum 800x400, skipping...\n", width, height)
 		return
 	}
 
@@ -154,7 +177,7 @@ func captureAndBatch() {
 	aspectRatio := float64(width) / float64(height)
 	validRatio := isValidAspectRatio(aspectRatio)
 	if !validRatio {
-		fmt.Printf("[AUTO] Invalid aspect ratio (%.2f), skipping...\n", aspectRatio)
+		debugLog("[AUTO] Invalid aspect ratio (%.2f), skipping...\n", aspectRatio)
 		showWarning("Invalid Screenshot", "Aspect ratio not supported. Use 16:9, 16:10, 21:9, or 4:3")
 		return
 	}
@@ -166,7 +189,7 @@ func captureAndBatch() {
 	if batchUploading {
 		pendingImages = append(pendingImages, img)
 		count := len(pendingImages)
-		fmt.Printf("[PENDING] Image %d added to pending queue (upload in progress)\n", count)
+		debugLog("[PENDING] Image %d added to pending queue (upload in progress)\n", count)
 		showBalloon("Screenshot queued", fmt.Sprintf("%d screenshot(s) waiting for next batch", count))
 		batchMutex.Unlock()
 		return
@@ -175,7 +198,7 @@ func captureAndBatch() {
 	// Add image to batch
 	batchImages = append(batchImages, img)
 	count := len(batchImages)
-	fmt.Printf("[BATCH] Image %d added to batch\n", count)
+	debugLog("[BATCH] Image %d added to batch\n", count)
 
 	// Show notification
 	if count == 1 {
@@ -196,14 +219,14 @@ func captureAndBatch() {
 func processBatch() {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("[BATCH] PANIC recovered: %v\n", r)
+			fmt.Printf("[BATCH] PANIC recovered: %v\n", r) // Always log panics
 		}
 		batchMutex.Lock()
 		batchUploading = false
 
 		// Check if there are pending images from during upload
 		if len(pendingImages) > 0 {
-			fmt.Printf("[BATCH] Moving %d pending images to new batch\n", len(pendingImages))
+			debugLog("[BATCH] Moving %d pending images to new batch\n", len(pendingImages))
 			batchImages = pendingImages
 			pendingImages = nil
 			// Start timer for the new batch
@@ -212,7 +235,7 @@ func processBatch() {
 		}
 
 		batchMutex.Unlock()
-		fmt.Println("[BATCH] Ready for new screenshots")
+		debugLn("[BATCH] Ready for new screenshots")
 	}()
 
 	batchMutex.Lock()
@@ -230,21 +253,21 @@ func processBatch() {
 	validImages := make([]image.Image, 0, len(images))
 	for i, img := range images {
 		if VerifySignature(img) {
-			fmt.Printf("[SIGNATURE] Image %d verified ✓\n", i+1)
+			debugLog("[SIGNATURE] Image %d verified ✓\n", i+1)
 			validImages = append(validImages, img)
 		} else {
-			fmt.Printf("[SIGNATURE] Image %d FAILED verification, skipping\n", i+1)
+			debugLog("[SIGNATURE] Image %d FAILED verification, skipping\n", i+1)
 		}
 	}
 
 	if len(validImages) == 0 {
-		fmt.Println("[BATCH] No valid images to upload")
+		fmt.Println("[BATCH] No valid images to upload") // User-facing error
 		showWarning("Upload Failed", "No valid screenshots to upload")
 		return
 	}
 
 	images = validImages
-	fmt.Printf("[BATCH] Processing %d images...\n", len(images))
+	fmt.Printf("[BATCH] Processing %d images...\n", len(images)) // User-facing status
 	showBalloon("Processing", fmt.Sprintf("Uploading %d screenshot(s)...", len(images)))
 
 	var resp *OCRResponse
@@ -273,7 +296,7 @@ func processBatch() {
 
 		// Check if some images were invalid (but we may still have valid kills)
 		if !IsValidTarkovScreenshot(resp) {
-			fmt.Println("[BATCH] Some images invalid, checking for valid kills...")
+			debugLn("[BATCH] Some images invalid, checking for valid kills...")
 		}
 
 		fmt.Println("[BATCH] Result:", summary)
