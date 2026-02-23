@@ -9,9 +9,76 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
 )
+
+// promptForToken shows a first-run dialog asking the user for their API token.
+// Loops until a token is entered or the user closes the dialog (exits the app).
+func promptForToken(cfg *Config) {
+	for {
+		var dlg *walk.Dialog
+		var tokenLE *walk.LineEdit
+		var enteredToken string
+
+		if err := (Dialog{
+			AssignTo: &dlg,
+			Title:    "Willkommen beim Tarkov Killcounter!",
+			MinSize:  Size{Width: 450, Height: 200},
+			Layout:   VBox{},
+			Children: []Widget{
+				Label{Text: "Bitte gib deinen API-Token von tarkov-stammtisch.de ein:"},
+				LineEdit{AssignTo: &tokenLE, PasswordMode: true},
+				PushButton{
+					Text: "Token erstellen auf tarkov-stammtisch.de",
+					OnClicked: func() {
+						openBrowser("https://tarkov-stammtisch.de/en/profile/killcounter")
+					},
+				},
+				VSpacer{},
+				Composite{
+					Layout: HBox{},
+					Children: []Widget{
+						HSpacer{},
+						PushButton{
+							Text: "Speichern",
+							OnClicked: func() {
+								enteredToken = tokenLE.Text()
+								dlg.Accept()
+							},
+						},
+						PushButton{
+							Text: "Beenden",
+							OnClicked: func() {
+								dlg.Cancel()
+							},
+						},
+					},
+				},
+			},
+		}).Create(nil); err != nil {
+			return
+		}
+
+		if dlg.Run() == walk.DlgCmdOK {
+			if enteredToken != "" {
+				SaveToken(enteredToken)
+				fmt.Println("[TOKEN] API-Token gespeichert")
+				return
+			}
+			// Empty token — show dialog again
+			walk.MsgBox(nil, "Token fehlt", "Bitte gib einen API-Token ein.", walk.MsgBoxIconWarning)
+			continue
+		}
+
+		// User clicked "Beenden" — exit app
+		fmt.Println("[TOKEN] Kein Token eingegeben, beende...")
+		os.Exit(0)
+	}
+}
 
 // ShowSettingsDialog opens a modal settings dialog. Returns true if the user
 // saved changes. Token, API, and hotkey settings are applied immediately.

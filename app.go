@@ -142,6 +142,11 @@ func RunApp() {
 		os.Exit(1)
 	}
 
+	// First run: prompt for API token if not set
+	if !HasToken() {
+		promptForToken(config)
+	}
+
 	// Apply configured hotkey
 	if config.Hotkeys.CaptureKey != "" {
 		SetHotkey(config.Hotkeys.CaptureKey)
