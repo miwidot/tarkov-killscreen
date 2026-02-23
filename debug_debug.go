@@ -10,3 +10,6 @@
 package main
 
 var debugMode = true
+
+// APIURL points to the dev API in debug builds.
+const APIURL = "https://dev.tarkov-stammtisch.de/api/ocr"

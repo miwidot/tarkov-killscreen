@@ -186,7 +186,7 @@ func UploadScreenshot(img image.Image, cfg *Config) (*OCRResponse, error) {
 	token = strings.TrimSpace(token)
 
 	debugLog("[UPLOAD] Token length: %d, first 4: %s, last 4: %s\n", len(token), token[:4], token[len(token)-4:])
-	debugLog("[UPLOAD] URL: %s, Mode: %s\n", cfg.API.URL, cfg.API.Mode)
+	debugLog("[UPLOAD] URL: %s, Mode: %s\n", APIURL, cfg.API.Mode)
 
 	// Compress image
 	imageData, err := compressImage(img, cfg)
@@ -215,7 +215,7 @@ func UploadScreenshot(img image.Image, cfg *Config) (*OCRResponse, error) {
 	writer.Close()
 
 	// Create request
-	req, err := http.NewRequest("POST", cfg.API.URL, &body)
+	req, err := http.NewRequest("POST", APIURL, &body)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +305,7 @@ func UploadMultipleScreenshots(images []image.Image, cfg *Config) (*OCRResponse,
 
 	writer.Close()
 
-	req, err := http.NewRequest("POST", cfg.API.URL, &body)
+	req, err := http.NewRequest("POST", APIURL, &body)
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +434,7 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 	fmt.Printf("[SAVE] Saving %d kills...\n", ocrResp.Data.TotalKills) // User-facing status
 
 	// Build save URL (replace /api/ocr with /api/kills/save)
-	saveURL := strings.Replace(cfg.API.URL, "/api/ocr", "/api/kills/save", 1)
+	saveURL := strings.Replace(APIURL, "/api/ocr", "/api/kills/save", 1)
 
 	req, err := http.NewRequest("POST", saveURL, bytes.NewBuffer(jsonBody))
 	if err != nil {

@@ -23,7 +23,6 @@ type HotkeyConfig struct {
 // APIConfig holds the OCR API connection settings.
 type APIConfig struct {
 	Enabled     bool   `json:"enabled"`
-	URL         string `json:"url"`
 	Mode        string `json:"mode"`
 	MaxWidth    int    `json:"max_width"`
 	JPEGQuality int    `json:"jpeg_quality"`
@@ -41,7 +40,6 @@ var defaultConfig = Config{
 	},
 	API: APIConfig{
 		Enabled:     true,
-		URL:         "https://dev.tarkov-stammtisch.de/api/ocr",
 		Mode:        "kills",
 		MaxWidth:    1920,
 		JPEGQuality: 85,
@@ -81,9 +79,6 @@ func LoadConfig() (*Config, error) {
 	}
 	if cfg.API.JPEGQuality == 0 {
 		cfg.API.JPEGQuality = defaultConfig.API.JPEGQuality
-	}
-	if cfg.API.URL == "" {
-		cfg.API.URL = defaultConfig.API.URL
 	}
 	if cfg.API.Mode == "" {
 		cfg.API.Mode = defaultConfig.API.Mode

@@ -2,7 +2,6 @@
 //
 // Provides a GUI dialog for configuring the application:
 // - API token (stored securely via Windows Credential Manager)
-// - API URL endpoint
 // - Enable/disable API uploads
 // - Capture hotkey selection (PrintScreen, F12, ScrollLock, Pause)
 //
@@ -20,13 +19,12 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	currentToken, _ := LoadToken()
 
 	var dlg *walk.Dialog
-	var tokenLE, urlLE *walk.LineEdit
+	var tokenLE *walk.LineEdit
 	var enabledCB *walk.CheckBox
 	var hotkeyCB *walk.ComboBox
 
 	// Temporäre Variablen für Werte
 	newToken := currentToken
-	newURL := cfg.API.URL
 	newEnabled := cfg.API.Enabled
 	newHotkey := cfg.Hotkeys.CaptureKey
 	if newHotkey == "" {
@@ -56,8 +54,6 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 		Children: []Widget{
 			Label{Text: "API Token:"},
 			LineEdit{AssignTo: &tokenLE, Text: currentToken, PasswordMode: true},
-			Label{Text: "API URL:"},
-			LineEdit{AssignTo: &urlLE, Text: cfg.API.URL},
 			CheckBox{AssignTo: &enabledCB, Text: "Enable API", Checked: cfg.API.Enabled},
 			VSeparator{},
 			Label{Text: "Capture Hotkey:"},
@@ -80,7 +76,6 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 						Text: "Save",
 						OnClicked: func() {
 							newToken = tokenLE.Text()
-							newURL = urlLE.Text()
 							newEnabled = enabledCB.Checked()
 							if hotkeyCB.CurrentIndex() >= 0 {
 								newHotkey = HotkeyOptions[hotkeyCB.CurrentIndex()]
@@ -107,7 +102,6 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 		} else {
 			DeleteToken()
 		}
-		cfg.API.URL = newURL
 		cfg.API.Enabled = newEnabled
 		cfg.Hotkeys.CaptureKey = newHotkey
 		SaveConfig(cfg)
