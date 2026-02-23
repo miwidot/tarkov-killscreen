@@ -30,8 +30,9 @@ type APIConfig struct {
 
 // Config is the top-level application configuration, serialized as config.json.
 type Config struct {
-	Hotkeys HotkeyConfig `json:"hotkeys"`
-	API     APIConfig    `json:"api"`
+	Hotkeys  HotkeyConfig `json:"hotkeys"`
+	API      APIConfig    `json:"api"`
+	Language string       `json:"language"`
 }
 
 var defaultConfig = Config{
@@ -44,6 +45,7 @@ var defaultConfig = Config{
 		MaxWidth:    1920,
 		JPEGQuality: 85,
 	},
+	Language: "de",
 }
 
 func getConfigPath() string {
@@ -82,6 +84,9 @@ func LoadConfig() (*Config, error) {
 	}
 	if cfg.API.Mode == "" {
 		cfg.API.Mode = defaultConfig.API.Mode
+	}
+	if cfg.Language == "" {
+		cfg.Language = defaultConfig.Language
 	}
 
 	return &cfg, nil

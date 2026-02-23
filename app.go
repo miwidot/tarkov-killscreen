@@ -142,6 +142,9 @@ func RunApp() {
 		os.Exit(1)
 	}
 
+	// Apply configured language
+	SetLanguage(config.Language)
+
 	// First run: prompt for API token if not set
 	if !HasToken() {
 		promptForToken(config)
@@ -168,7 +171,7 @@ func RunApp() {
 		notifyIcon.SetIcon(icon)
 	}
 
-	notifyIcon.SetToolTip(fmt.Sprintf("Tarkov Screenshoter %s - Auto-capture active", CurrentVersion))
+	notifyIcon.SetToolTip(fmt.Sprintf(T("tray.tooltip"), CurrentVersion))
 	notifyIcon.SetVisible(true)
 
 	buildTrayMenu()
@@ -178,7 +181,7 @@ func RunApp() {
 	// Use hotkey-based capture (registers and watches on same thread)
 	go WatchHotkey()
 	hotkeyName := GetHotkeyName(currentHotkey)
-	showBalloon("Tarkov Screenshoter "+CurrentVersion, fmt.Sprintf("Press %s to capture! Screenshots are auto-batched (20s window).", hotkeyName))
+	showBalloon("Tarkov Screenshoter "+CurrentVersion, fmt.Sprintf(T("ready.capture"), hotkeyName))
 
 	mainWindow.Run()
 }
@@ -253,7 +256,7 @@ func captureAndBatch() {
 	validRatio := isValidAspectRatio(aspectRatio)
 	if !validRatio {
 		debugLog("[AUTO] Invalid aspect ratio (%.2f), skipping...\n", aspectRatio)
-		showWarning("Invalid Screenshot", "Aspect ratio not supported. Use 16:9, 16:10, 21:9, or 4:3")
+		showWarning(T("invalid.screenshot"), T("invalid.aspect"))
 		return
 	}
 
@@ -265,7 +268,7 @@ func captureAndBatch() {
 		pendingImages = append(pendingImages, img)
 		count := len(pendingImages)
 		debugLog("[PENDING] Image %d added to pending queue (upload in progress)\n", count)
-		showBalloon("Screenshot queued", fmt.Sprintf("%d screenshot(s) waiting for next batch", count))
+		showBalloon(T("screenshot.queued"), fmt.Sprintf(T("screenshot.queued.count"), count))
 		batchMutex.Unlock()
 		return
 	}
@@ -277,9 +280,9 @@ func captureAndBatch() {
 
 	// Show notification
 	if count == 1 {
-		showBalloon("Screenshot captured", "Waiting 20s for more screenshots...")
+		showBalloon(T("screenshot.captured"), T("screenshot.waiting"))
 	} else {
-		showBalloon("Screenshot captured", fmt.Sprintf("%d screenshots in batch. Waiting 20s...", count))
+		showBalloon(T("screenshot.captured"), fmt.Sprintf(T("screenshot.batch"), count))
 	}
 
 	// Reset timer
@@ -309,7 +312,7 @@ func processBatch() {
 			pendingImages = nil
 			// Start timer for the new batch
 			batchTimer = time.AfterFunc(batchWaitTime, processBatch)
-			showBalloon("New batch started", fmt.Sprintf("%d screenshot(s) from queue. Waiting 20s...", len(batchImages)))
+			showBalloon(T("batch.new"), fmt.Sprintf(T("batch.new.msg"), len(batchImages)))
 		}
 
 		batchMutex.Unlock()
@@ -340,13 +343,13 @@ func processBatch() {
 
 	if len(validImages) == 0 {
 		fmt.Println("[BATCH] No valid images to upload") // User-facing error
-		showWarning("Upload Failed", "No valid screenshots to upload")
+		showWarning(T("upload.failed"), T("batch.novalid"))
 		return
 	}
 
 	images = validImages
 	fmt.Printf("[BATCH] Processing %d images...\n", len(images)) // User-facing status
-	showBalloon("Processing", fmt.Sprintf("Uploading %d screenshot(s)...", len(images)))
+	showBalloon(T("batch.processing"), fmt.Sprintf(T("batch.uploading"), len(images)))
 
 	var resp *OCRResponse
 	var err error
@@ -365,7 +368,7 @@ func processBatch() {
 
 	if err != nil {
 		fmt.Println("[BATCH] Error:", err)
-		showBalloon("Error", err.Error())
+		showBalloon(T("error"), err.Error())
 		return
 	}
 
@@ -384,20 +387,20 @@ func processBatch() {
 			saveResp, err := SaveKills(resp, config)
 			if err != nil {
 				fmt.Println("[BATCH] Save error:", err)
-				showBalloon("Kill Analysis", summary+" (not saved: "+err.Error()+")")
+				showBalloon(T("kills.analysis"), summary+" (not saved: "+err.Error()+")")
 			} else {
 				fmt.Println("[BATCH] Saved! RaidID:", saveResp.RaidID)
-				showBalloon("Kills Saved!", summary)
+				showBalloon(T("kills.saved"), summary)
 			}
 		} else if !IsValidTarkovScreenshot(resp) {
 			// No kills and invalid images - warn user
 			reason := FormatKillSummary(resp)
-			showWarning("Not Tarkov Screenshots", reason)
+			showWarning(T("not.tarkov"), reason)
 		} else {
-			showBalloon("Analysis Complete", summary)
+			showBalloon(T("analysis.complete"), summary)
 		}
 	} else {
-		showBalloon("Done", "No kills detected")
+		showBalloon(T("batch.done"), T("batch.nokills"))
 	}
 }
 
@@ -406,7 +409,7 @@ func processBatch() {
 func buildTrayMenu() {
 	statusAction := walk.NewAction()
 	hotkeyLabel := GetHotkeyName(currentHotkey)
-	statusAction.SetText(fmt.Sprintf("Hotkey: %s (20s batch)", hotkeyLabel))
+	statusAction.SetText(fmt.Sprintf(T("tray.hotkey"), hotkeyLabel))
 	statusAction.SetEnabled(false)
 	notifyIcon.ContextMenu().Actions().Add(statusAction)
 
@@ -419,7 +422,7 @@ func buildTrayMenu() {
 
 	// Process now (skip wait)
 	processNowAction := walk.NewAction()
-	processNowAction.SetText("Process Now (skip wait)")
+	processNowAction.SetText(T("tray.processnow"))
 	processNowAction.Triggered().Attach(func() {
 		batchMutex.Lock()
 		if batchTimer != nil {
@@ -432,7 +435,7 @@ func buildTrayMenu() {
 	notifyIcon.ContextMenu().Actions().Add(processNowAction)
 
 	settingsAction := walk.NewAction()
-	settingsAction.SetText("Settings...")
+	settingsAction.SetText(T("tray.settings"))
 	settingsAction.Triggered().Attach(func() {
 		showSettings()
 	})
@@ -441,7 +444,7 @@ func buildTrayMenu() {
 	notifyIcon.ContextMenu().Actions().Add(walk.NewSeparatorAction())
 
 	exitAction := walk.NewAction()
-	exitAction.SetText("Exit")
+	exitAction.SetText(T("tray.exit"))
 	exitAction.Triggered().Attach(func() {
 		watching = false
 		unregisterGlobalHotkey()
@@ -460,7 +463,7 @@ func updateTokenAction(action *walk.Action) {
 			action.SetText("Token: OK")
 		}
 	} else {
-		action.SetText("Token: NOT SET")
+		action.SetText(T("tray.token.notset"))
 	}
 }
 
@@ -469,7 +472,8 @@ func showSettings() {
 	saved, _ := ShowSettingsDialog(nil, config)
 	if saved {
 		config, _ = LoadConfig()
-		showBalloon("Settings", "Configuration updated")
+		SetLanguage(config.Language)
+		showBalloon(T("settings.title"), T("settings.updated"))
 	}
 }
 

@@ -21,8 +21,8 @@ import (
 func main() {
 	// Prevent multiple instances
 	if IsAlreadyRunning() {
-		walk.MsgBox(nil, "Tarkov Kill Screen Analyzer",
-			"Die Anwendung läuft bereits.\n\nThe application is already running.",
+		walk.MsgBox(nil, T("already.running.title"),
+			T("already.running.msg"),
 			walk.MsgBoxIconWarning)
 		fmt.Println("Another instance is already running. Exiting.")
 		os.Exit(0)

@@ -4,6 +4,7 @@
 // - API token (stored securely via Windows Credential Manager)
 // - Enable/disable API uploads
 // - Capture hotkey selection (PrintScreen, F12, ScrollLock, Pause)
+// - UI language (Deutsch / English)
 //
 // Changes are applied immediately after saving.
 package main
@@ -26,14 +27,14 @@ func promptForToken(cfg *Config) {
 
 		if err := (Dialog{
 			AssignTo: &dlg,
-			Title:    "Willkommen beim Tarkov Killcounter!",
+			Title:    T("welcome.title"),
 			MinSize:  Size{Width: 450, Height: 200},
 			Layout:   VBox{},
 			Children: []Widget{
-				Label{Text: "Bitte gib deinen API-Token von tarkov-stammtisch.de ein:"},
+				Label{Text: T("welcome.prompt")},
 				LineEdit{AssignTo: &tokenLE, PasswordMode: true},
 				PushButton{
-					Text: "Token erstellen auf tarkov-stammtisch.de",
+					Text: T("welcome.link"),
 					OnClicked: func() {
 						openBrowser("https://tarkov-stammtisch.de/en/profile/killcounter")
 					},
@@ -44,14 +45,14 @@ func promptForToken(cfg *Config) {
 					Children: []Widget{
 						HSpacer{},
 						PushButton{
-							Text: "Speichern",
+							Text: T("welcome.save"),
 							OnClicked: func() {
 								enteredToken = tokenLE.Text()
 								dlg.Accept()
 							},
 						},
 						PushButton{
-							Text: "Beenden",
+							Text: T("welcome.exit"),
 							OnClicked: func() {
 								dlg.Cancel()
 							},
@@ -70,18 +71,18 @@ func promptForToken(cfg *Config) {
 				return
 			}
 			// Empty token — show dialog again
-			walk.MsgBox(nil, "Token fehlt", "Bitte gib einen API-Token ein.", walk.MsgBoxIconWarning)
+			walk.MsgBox(nil, T("welcome.missing"), T("welcome.missing.msg"), walk.MsgBoxIconWarning)
 			continue
 		}
 
-		// User clicked "Beenden" — exit app
+		// User clicked exit — exit app
 		fmt.Println("[TOKEN] Kein Token eingegeben, beende...")
 		os.Exit(0)
 	}
 }
 
 // ShowSettingsDialog opens a modal settings dialog. Returns true if the user
-// saved changes. Token, API, and hotkey settings are applied immediately.
+// saved changes. Token, API, hotkey, and language settings are applied immediately.
 func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	currentToken, _ := LoadToken()
 
@@ -89,13 +90,17 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	var tokenLE *walk.LineEdit
 	var enabledCB *walk.CheckBox
 	var hotkeyCB *walk.ComboBox
+	var langCB *walk.ComboBox
 
-	// Temporäre Variablen für Werte
 	newToken := currentToken
 	newEnabled := cfg.API.Enabled
 	newHotkey := cfg.Hotkeys.CaptureKey
 	if newHotkey == "" {
 		newHotkey = "PrintScreen"
+	}
+	newLang := cfg.Language
+	if newLang == "" {
+		newLang = "de"
 	}
 
 	// Find current hotkey index
@@ -113,17 +118,32 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 		hotkeyLabels[i] = HotkeyLabels[opt]
 	}
 
+	// Find current language index
+	langIndex := 0
+	for i, opt := range LanguageOptions {
+		if opt == newLang {
+			langIndex = i
+			break
+		}
+	}
+
+	// Build language labels for dropdown
+	langLabels := make([]string, len(LanguageOptions))
+	for i, opt := range LanguageOptions {
+		langLabels[i] = LanguageLabels[opt]
+	}
+
 	if err := (Dialog{
 		AssignTo: &dlg,
-		Title:    "Settings",
-		MinSize:  Size{Width: 400, Height: 250},
+		Title:    T("settings.title"),
+		MinSize:  Size{Width: 400, Height: 300},
 		Layout:   VBox{},
 		Children: []Widget{
-			Label{Text: "API Token:"},
+			Label{Text: T("settings.token")},
 			LineEdit{AssignTo: &tokenLE, Text: currentToken, PasswordMode: true},
-			CheckBox{AssignTo: &enabledCB, Text: "Enable API", Checked: cfg.API.Enabled},
+			CheckBox{AssignTo: &enabledCB, Text: T("settings.enable"), Checked: cfg.API.Enabled},
 			VSeparator{},
-			Label{Text: "Capture Hotkey:"},
+			Label{Text: T("settings.hotkey")},
 			ComboBox{
 				AssignTo:     &hotkeyCB,
 				Model:        hotkeyLabels,
@@ -134,24 +154,39 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 					}
 				},
 			},
+			VSeparator{},
+			Label{Text: T("settings.lang")},
+			ComboBox{
+				AssignTo:     &langCB,
+				Model:        langLabels,
+				CurrentIndex: langIndex,
+				OnCurrentIndexChanged: func() {
+					if langCB.CurrentIndex() >= 0 && langCB.CurrentIndex() < len(LanguageOptions) {
+						newLang = LanguageOptions[langCB.CurrentIndex()]
+					}
+				},
+			},
 			VSpacer{},
 			Composite{
 				Layout: HBox{},
 				Children: []Widget{
 					HSpacer{},
 					PushButton{
-						Text: "Save",
+						Text: T("settings.save"),
 						OnClicked: func() {
 							newToken = tokenLE.Text()
 							newEnabled = enabledCB.Checked()
 							if hotkeyCB.CurrentIndex() >= 0 {
 								newHotkey = HotkeyOptions[hotkeyCB.CurrentIndex()]
 							}
+							if langCB.CurrentIndex() >= 0 {
+								newLang = LanguageOptions[langCB.CurrentIndex()]
+							}
 							dlg.Accept()
 						},
 					},
 					PushButton{
-						Text: "Cancel",
+						Text: T("settings.cancel"),
 						OnClicked: func() {
 							dlg.Cancel()
 						},
@@ -171,10 +206,14 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 		}
 		cfg.API.Enabled = newEnabled
 		cfg.Hotkeys.CaptureKey = newHotkey
+		cfg.Language = newLang
 		SaveConfig(cfg)
 
 		// Apply hotkey change immediately
 		SetHotkey(newHotkey)
+
+		// Apply language change immediately
+		SetLanguage(newLang)
 
 		return true, nil
 	}

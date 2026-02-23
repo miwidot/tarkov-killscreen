@@ -13,8 +13,8 @@ A lightweight Windows system tray application that helps players track their kil
 - **No automation** - We never send inputs to the game
 
 **What this tool actually does:**
-1. Monitors the Windows clipboard for images (standard Windows API)
-2. When user manually takes a screenshot (PrintScreen/Win+Shift+S), we detect it
+1. Registers a global hotkey (Print Screen, F12, Scroll Lock, or Pause)
+2. When user presses the hotkey, captures the screen directly via Windows API
 3. Uploads the screenshot to our web service for OCR text recognition
 4. Displays the extracted kill information to the user
 
@@ -24,12 +24,14 @@ This is functionally identical to a user manually uploading screenshots to a web
 
 ## Features
 
-- **Clipboard Monitoring** - Detects when user takes screenshots
-- **Smart Batching** - Collects multiple screenshots within 15 seconds (for scrollable kill lists)
+- **Hotkey Capture** - Press a configurable hotkey to capture screenshots directly
+- **Smart Batching** - Collects multiple screenshots within a 20-second window (for scrollable kill lists)
 - **OCR Analysis** - Sends screenshots to API for text extraction
 - **Kill Tracking** - Saves analyzed kills to user's profile
+- **Re-Capture Prevention** - Detects screenshots of screenshots via pixel signature
 - **System Tray** - Runs quietly in the background
 - **Auto-Update** - Notifies when new versions are available
+- **i18n** - UI available in German (default) and English
 
 ## Client-Side Filters
 
@@ -39,8 +41,9 @@ To minimize server costs, the app filters invalid screenshots locally before upl
 |--------|-------------|
 | **Tarkov Process Check** | Only processes screenshots when `EscapeFromTarkov.exe` is running |
 | **Minimum Size** | Rejects images smaller than 800x400 pixels |
-| **Aspect Ratio** | Accepts ratios between 1.2 and 3.8 (rejects multi-monitor captures) |
-| **Duplicate Detection** | Skips identical images using pixel hash comparison |
+| **Aspect Ratio** | Accepts ratios between 1.2 and 3.8 (covers 4:3 to 32:9, rejects multi-monitor) |
+| **Re-Capture Detection** | Detects and ignores screenshots of screenshots via embedded pixel signature |
+| **Image Viewer Check** | Blocks capture when an image viewer is open to prevent accidental re-capture |
 
 ---
 
@@ -48,20 +51,19 @@ To minimize server costs, the app filters invalid screenshots locally before upl
 
 1. Download the latest release from [Releases](https://github.com/miwidot/tarkov-killscreen/releases)
 2. Run `screenshoter.exe`
-3. Right-click the tray icon → Settings
-4. Enter your API token (get it from the web app)
-5. Click Save
+3. On first run, enter your API token (get it from [tarkov-stammtisch.de](https://tarkov-stammtisch.de/en/profile/killcounter))
+4. The app starts in the system tray, ready to capture
 
 ## Usage
 
 1. Start the app (it will minimize to system tray)
 2. Play Escape from Tarkov
-3. At the end of a raid, take screenshots of your kill screen
-   - Use `Win+Shift+S` to select just the kill list area, or
-   - Use `PrintScreen` for full screen capture
+3. At the end of a raid, press the capture hotkey (default: Print Screen)
 4. If you have many kills (scrollable list), take multiple screenshots
-5. After 15 seconds of no new screenshots, all images are uploaded
+5. After 20 seconds of no new screenshots, all images are uploaded together
 6. You'll receive a notification with your kill summary
+
+**Tip:** Use "Process Now" from the tray menu to skip the 20-second wait.
 
 ---
 
@@ -69,94 +71,25 @@ To minimize server costs, the app filters invalid screenshots locally before upl
 
 ```
 screenshoter/
-├── main.go          # Entry point
-├── app.go           # Main application logic, tray menu, clipboard watcher
-├── clipboard.go     # Windows clipboard API (read images)
-├── windows.go       # Windows process API (check if Tarkov is running)
-├── upload.go        # HTTP upload to OCR API, save kills to database
-├── config.go        # Configuration file handling
-├── credential.go    # Windows Credential Manager (secure token storage)
-├── settings.go      # Settings dialog UI
-├── splash.go        # Splash screen on startup
-├── version.go       # Version checking, auto-update notifications
-├── icon.go          # Tray icon generation
-├── screenshot.go    # Screenshot encoding (JPEG compression)
-├── logo.png         # Application logo (embedded)
-└── config.json      # User configuration (not committed)
+├── main.go            # Entry point, single-instance check
+├── app.go             # Core logic: tray menu, batching, notifications
+├── hotkey.go          # Global hotkey registration, screen capture
+├── clipboard.go       # Windows clipboard API (legacy fallback)
+├── windows.go         # Windows process API (Tarkov detection, display info)
+├── upload.go          # HTTP upload to OCR API, save kills
+├── config.go          # Configuration file handling (config.json)
+├── credential.go      # Windows Credential Manager (secure token storage)
+├── settings.go        # Settings dialog UI (token, hotkey, language)
+├── i18n.go            # Internationalization (DE/EN translations)
+├── signature.go       # Pixel signature embedding/verification
+├── version.go         # Auto-update checker (GitHub Releases)
+├── splash.go          # Splash screen on startup
+├── icon.go            # Tray icon generation
+├── log.go             # Logging utilities
+├── debug_debug.go     # Debug build: verbose console output
+├── debug_release.go   # Release build: quiet output
+└── config.json        # User configuration (not committed)
 ```
-
-## File Descriptions
-
-### main.go
-Entry point. Simply calls `RunApp()`.
-
-### app.go
-Core application logic:
-- Initializes system tray icon and menu
-- Runs clipboard watcher in background goroutine
-- Implements auto-batching (15 second window for multiple screenshots)
-- Handles image validation (size, aspect ratio, duplicates)
-- Coordinates upload and displays notifications
-
-### clipboard.go
-Windows clipboard interaction using `user32.dll`:
-- `GetClipboardSequenceNumber()` - Detects clipboard changes
-- `HasClipboardImage()` - Checks if clipboard contains an image
-- `GetClipboardImage()` - Extracts image data from clipboard (CF_DIB format)
-
-**Note:** This only reads from clipboard - it does not interact with any application.
-
-### windows.go
-Windows process enumeration using `kernel32.dll`:
-- `IsTarkovRunning()` - Checks if `EscapeFromTarkov.exe` is in the process list
-
-Uses `CreateToolhelp32Snapshot` and `Process32First/Next` - standard Windows APIs for listing running processes. This does NOT access the game process memory.
-
-### upload.go
-HTTP communication with the backend API:
-- `UploadScreenshot()` - Uploads single image for OCR analysis
-- `UploadMultipleScreenshots()` - Uploads batch of images
-- `SaveKills()` - Saves analyzed kills to user's database
-
-All communication is HTTPS to our own server. No game servers are contacted.
-
-### config.go
-Handles `config.json` for user preferences:
-- Screenshot save path
-- API URL and settings
-- JPEG quality settings
-
-### credential.go
-Secure token storage using Windows Credential Manager (`advapi32.dll`):
-- `SaveToken()` - Stores API token securely
-- `LoadToken()` - Retrieves API token
-- `HasToken()` - Checks if token exists
-
-Tokens are never stored in plain text files.
-
-### settings.go
-Settings dialog using [walk](https://github.com/lxn/walk) GUI library:
-- API token input
-- API URL configuration
-- Enable/disable toggle
-
-### version.go
-Automatic update checker:
-- Queries GitHub Releases API
-- Compares version strings
-- Shows Windows dialog if update available
-- Checks on startup and every 30 minutes
-
-### splash.go
-Shows logo briefly on startup using Windows API.
-
-### icon.go
-Generates the tray icon programmatically (green circle with "T").
-
-### screenshot.go
-Image processing:
-- Resizes large images to max width (saves bandwidth)
-- Encodes as JPEG with configurable quality
 
 ---
 
@@ -169,18 +102,19 @@ Image processing:
 ### Build Commands
 
 ```bash
-# Release build (no console window)
-go build -ldflags -H=windowsgui -o screenshoter.exe
+# Release build (quiet output)
+go build -o screenshoter.exe
 
-# Debug build (with console for logging)
-go build -o screenshoter_debug.exe
+# Debug build (verbose console output)
+go build -tags debug -o screenshoter_debug.exe
 ```
 
 ### Dependencies
 
 ```
-github.com/lxn/walk    # Windows GUI library
-github.com/lxn/win     # Windows API bindings
+github.com/lxn/walk        # Windows GUI library
+github.com/lxn/win         # Windows API bindings
+github.com/kbinani/screenshot  # Screen capture
 ```
 
 ---
@@ -191,18 +125,31 @@ Configuration is stored in `config.json` next to the executable:
 
 ```json
 {
-  "screenshot_path": "C:\\Users\\YourName\\Pictures\\Screenshots",
+  "hotkeys": {
+    "capture_key": "PrintScreen"
+  },
   "api": {
     "enabled": true,
-    "url": "https://tarkov-stammtisch.de/api/ocr",
     "mode": "kills",
     "max_width": 1920,
     "jpeg_quality": 85
-  }
+  },
+  "language": "de"
 }
 ```
 
+| Field | Description |
+|-------|-------------|
+| `hotkeys.capture_key` | Capture hotkey: `PrintScreen`, `F12`, `ScrollLock`, or `Pause` |
+| `api.enabled` | Enable/disable API uploads |
+| `api.mode` | OCR mode (always `kills`) |
+| `api.max_width` | Max image width before resize (saves bandwidth) |
+| `api.jpeg_quality` | JPEG compression quality (1-100) |
+| `language` | UI language: `de` (German) or `en` (English) |
+
 **Note:** The API token is NOT stored in this file. It is stored securely in Windows Credential Manager.
+
+The API URL is hardcoded per build and not configurable.
 
 ---
 
@@ -221,11 +168,10 @@ Configuration is stored in `config.json` next to the executable:
 
 | DLL | Function | Purpose |
 |-----|----------|---------|
-| user32.dll | GetClipboardSequenceNumber | Detect clipboard changes |
-| user32.dll | OpenClipboard/CloseClipboard | Access clipboard |
-| user32.dll | GetClipboardData | Read clipboard content |
-| user32.dll | IsClipboardFormatAvailable | Check for image data |
-| kernel32.dll | GlobalLock/GlobalUnlock | Access clipboard memory |
+| user32.dll | RegisterHotKey/UnregisterHotKey | Global hotkey registration |
+| user32.dll | GetAsyncKeyState | Hotkey polling |
+| user32.dll | GetClipboardSequenceNumber | Detect clipboard changes (fallback) |
+| user32.dll | OpenClipboard/CloseClipboard | Access clipboard (fallback) |
 | kernel32.dll | CreateToolhelp32Snapshot | List running processes |
 | kernel32.dll | Process32First/Next | Enumerate processes |
 | advapi32.dll | CredWrite/CredRead/CredDelete | Credential Manager |

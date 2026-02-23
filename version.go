@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	CurrentVersion = "1.0.0-beta3"
+	CurrentVersion = "1.0.0-beta4"
 	GithubRepo     = "miwidot/tarkov-killscreen"
 )
 
@@ -115,18 +115,11 @@ func extractVersionNumber(version string) int {
 
 // showUpdateDialog shows a Windows message box with update info
 func showUpdateDialog(release GithubRelease) {
-	message := fmt.Sprintf(
-		"Eine neue Version ist verfügbar!\n\n"+
-			"Aktuelle Version: %s\n"+
-			"Neue Version: %s\n\n"+
-			"Jetzt herunterladen?",
-		CurrentVersion,
-		release.TagName,
-	)
+	message := fmt.Sprintf(T("update.message"), CurrentVersion, release.TagName)
 
 	result := walk.MsgBox(
 		nil,
-		"Update verfügbar",
+		T("update.title"),
 		message,
 		walk.MsgBoxIconInformation|walk.MsgBoxYesNo,
 	)

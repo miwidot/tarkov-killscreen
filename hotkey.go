@@ -212,7 +212,7 @@ func captureScreen() {
 	// Check if image viewer is running (re-capture prevention)
 	if isViewer, viewerName := IsImageViewerRunning(); isViewer {
 		fmt.Printf("[CAPTURE] Image viewer detected: %s - blocking to prevent re-capture\n", viewerName) // User-facing warning
-		showWarning("Capture Blocked", fmt.Sprintf("Close %s first to prevent re-capture", viewerName))
+		showWarning(T("capture.blocked"), fmt.Sprintf(T("capture.closeviewer"), viewerName))
 		return
 	}
 
@@ -262,7 +262,7 @@ func addToBatch(img image.Image) {
 	// Check for re-capture (screenshot of a screenshot with our signature)
 	if HasSignature(img) {
 		fmt.Println("[CAPTURE] Re-capture detected! Ignoring...") // User-facing warning
-		showWarning("Re-Capture Detected", "This appears to be a screenshot of a screenshot. Ignored.")
+		showWarning(T("capture.recapture"), T("capture.recapture.msg"))
 		return
 	}
 
@@ -284,7 +284,7 @@ func addToBatch(img image.Image) {
 		pendingImages = append(pendingImages, img)
 		count := len(pendingImages)
 		debugLog("[PENDING] Image %d added to pending queue\n", count)
-		showBalloon("Screenshot queued", fmt.Sprintf("%d screenshot(s) waiting", count))
+		showBalloon(T("screenshot.queued"), fmt.Sprintf(T("screenshot.queued.count"), count))
 		batchMutex.Unlock()
 		return
 	}
@@ -294,9 +294,9 @@ func addToBatch(img image.Image) {
 	fmt.Printf("[BATCH] Screenshot %d added, waiting 20s...\n", count)
 
 	if count == 1 {
-		showBalloon("Screenshot captured", "Waiting 20s for more screenshots...")
+		showBalloon(T("screenshot.captured"), T("screenshot.waiting"))
 	} else {
-		showBalloon("Screenshot captured", fmt.Sprintf("%d screenshots in batch. Waiting 20s...", count))
+		showBalloon(T("screenshot.captured"), fmt.Sprintf(T("screenshot.batch"), count))
 	}
 
 	// Reset timer
