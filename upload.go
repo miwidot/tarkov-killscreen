@@ -31,6 +31,7 @@ import (
 	"golang.org/x/image/draw"
 )
 
+// KillData represents a single kill entry returned by the OCR API.
 type KillData struct {
 	Number   int     `json:"number"`
 	Location string  `json:"location"`
@@ -44,6 +45,7 @@ type KillData struct {
 	Status   string  `json:"status"`
 }
 
+// KillSummary contains aggregated kill statistics for a raid.
 type KillSummary struct {
 	PMCKills      int                `json:"pmcKills"`
 	ScavKills     int                `json:"scavKills"`
@@ -58,18 +60,21 @@ type KillSummary struct {
 	RaidDuration  string             `json:"raidDuration"`
 }
 
+// OCRData holds the parsed kill data from OCR analysis.
 type OCRData struct {
 	TotalKills int         `json:"totalKills"`
 	Kills      []KillData  `json:"kills"`
 	Summary    KillSummary `json:"summary"`
 }
 
+// InvalidDetail describes why a specific image was rejected by the server.
 type InvalidDetail struct {
 	Index  int    `json:"index"`
 	Hash   string `json:"hash"`
 	Reason string `json:"reason"`
 }
 
+// Validation contains server-side image validation results.
 type Validation struct {
 	ValidImages    int             `json:"validImages"`
 	InvalidImages  int             `json:"invalidImages"`
@@ -77,6 +82,7 @@ type Validation struct {
 	InvalidDetails []InvalidDetail `json:"invalidDetails"`
 }
 
+// ImageHash identifies a processed image by its server-computed hash.
 type ImageHash struct {
 	Index     int    `json:"index"`
 	Hash      string `json:"hash"`
@@ -85,6 +91,7 @@ type ImageHash struct {
 	ImagePath string `json:"imagePath,omitempty"`
 }
 
+// ImagesInfo summarizes how the server processed the uploaded images.
 type ImagesInfo struct {
 	Total            int         `json:"total"`
 	Processed        int         `json:"processed"`
@@ -93,6 +100,7 @@ type ImagesInfo struct {
 	Hashes           []ImageHash `json:"hashes"`
 }
 
+// OCRResponse is the top-level response from the /api/ocr endpoint.
 type OCRResponse struct {
 	Success    bool        `json:"success"`
 	Mode       string      `json:"mode"`
@@ -106,13 +114,14 @@ type OCRResponse struct {
 	} `json:"usage"`
 }
 
-// Save request types
+// SaveImageHash links an image hash to its filename for the save request.
 type SaveImageHash struct {
 	Hash      string `json:"hash"`
 	FileName  string `json:"fileName"`
 	ImagePath string `json:"imagePath,omitempty"`
 }
 
+// SaveKillsRequest is the payload sent to /api/kills/save to persist a raid.
 type SaveKillsRequest struct {
 	Map          string            `json:"map"`
 	RaidDate     string            `json:"raidDate"`
@@ -129,6 +138,7 @@ type SaveKillsRequest struct {
 	ImageHashes  []SaveImageHash   `json:"imageHashes"`
 }
 
+// SaveKillsResponse is the server's reply after saving a raid.
 type SaveKillsResponse struct {
 	Success bool   `json:"success"`
 	RaidID  string `json:"raidId"`

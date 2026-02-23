@@ -22,10 +22,11 @@ import (
 )
 
 const (
-	CurrentVersion = "alpha9"
+	CurrentVersion = "1.0.0-beta1"
 	GithubRepo     = "miwidot/tarkov-killscreen"
 )
 
+// GithubRelease represents the JSON response from the GitHub Releases API.
 type GithubRelease struct {
 	TagName string `json:"tag_name"`
 	HTMLURL string `json:"html_url"`

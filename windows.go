@@ -50,6 +50,8 @@ const (
 	MAX_PATH             = 260
 )
 
+// PROCESSENTRY32W is the Windows Toolhelp PROCESSENTRY32W structure used
+// to enumerate running processes.
 type PROCESSENTRY32W struct {
 	Size              uint32
 	CntUsage          uint32
@@ -63,6 +65,7 @@ type PROCESSENTRY32W struct {
 	ExeFile           [MAX_PATH]uint16
 }
 
+// RECT is the Windows RECT structure (left, top, right, bottom).
 type RECT struct {
 	Left   int32
 	Top    int32
@@ -70,6 +73,7 @@ type RECT struct {
 	Bottom int32
 }
 
+// MONITORINFO is the Windows MONITORINFO structure used by GetMonitorInfoW.
 type MONITORINFO struct {
 	Size    uint32
 	Monitor RECT
@@ -295,7 +299,8 @@ var imageViewerProcesses = []string{
 	"screenpresso.exe",
 }
 
-// processHasVisibleWindow checks if a process has any visible, non-minimized windows
+// processHasVisibleWindow checks if a process has any visible, non-minimized
+// windows by enumerating all top-level windows.
 func processHasVisibleWindow(processID uint32) bool {
 	hasVisible := false
 

@@ -15,10 +15,12 @@ import (
 	"path/filepath"
 )
 
+// HotkeyConfig holds the configured capture hotkey.
 type HotkeyConfig struct {
 	CaptureKey string `json:"capture_key"` // "PrintScreen", "F12", "F11", "ScrollLock"
 }
 
+// APIConfig holds the OCR API connection settings.
 type APIConfig struct {
 	Enabled     bool   `json:"enabled"`
 	URL         string `json:"url"`
@@ -27,6 +29,7 @@ type APIConfig struct {
 	JPEGQuality int    `json:"jpeg_quality"`
 }
 
+// Config is the top-level application configuration, serialized as config.json.
 type Config struct {
 	Hotkeys HotkeyConfig `json:"hotkeys"`
 	API     APIConfig    `json:"api"`
@@ -50,6 +53,9 @@ func getConfigPath() string {
 	return filepath.Join(filepath.Dir(exe), "config.json")
 }
 
+// LoadConfig reads config.json from the executable directory.
+// If the file does not exist, a default config is created and returned.
+// Missing fields in existing configs are backfilled with defaults.
 func LoadConfig() (*Config, error) {
 	configPath := getConfigPath()
 
@@ -86,6 +92,7 @@ func LoadConfig() (*Config, error) {
 	return &cfg, nil
 }
 
+// SaveConfig writes the configuration to config.json next to the executable.
 func SaveConfig(cfg *Config) error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {

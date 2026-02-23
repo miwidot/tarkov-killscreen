@@ -46,6 +46,8 @@ const (
 	CF_DIBV5  = 17
 )
 
+// BITMAPINFOHEADER is the Windows BITMAPINFOHEADER structure used to
+// describe the dimensions and color format of a device-independent bitmap.
 type BITMAPINFOHEADER struct {
 	Size          uint32
 	Width         int32
@@ -60,7 +62,7 @@ type BITMAPINFOHEADER struct {
 	ClrImportant  uint32
 }
 
-// HasClipboardImage checks if there's an image in clipboard
+// HasClipboardImage returns true if the clipboard currently contains a DIB image.
 func HasClipboardImage() bool {
 	ret, _, _ := procIsClipboardFormatAvailable.Call(CF_DIB)
 	return ret != 0

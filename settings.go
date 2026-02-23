@@ -1,3 +1,12 @@
+// settings.go - Settings Dialog
+//
+// Provides a GUI dialog for configuring the application:
+// - API token (stored securely via Windows Credential Manager)
+// - API URL endpoint
+// - Enable/disable API uploads
+// - Capture hotkey selection (PrintScreen, F12, ScrollLock, Pause)
+//
+// Changes are applied immediately after saving.
 package main
 
 import (
@@ -5,6 +14,8 @@ import (
 	. "github.com/lxn/walk/declarative"
 )
 
+// ShowSettingsDialog opens a modal settings dialog. Returns true if the user
+// saved changes. Token, API, and hotkey settings are applied immediately.
 func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	currentToken, _ := LoadToken()
 

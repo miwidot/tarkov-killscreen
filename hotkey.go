@@ -24,7 +24,8 @@ import (
 	"github.com/kbinani/screenshot"
 )
 
-// DebugSaveScreenshot saves screenshot to debug folder for inspection
+// DebugSaveScreenshots controls whether captured images are saved to a debug/
+// folder next to the executable. Enabled automatically in debug builds.
 var DebugSaveScreenshots = debugMode
 
 func init() {
@@ -43,6 +44,8 @@ func init() {
 	)
 }
 
+// debugSaveScreenshot writes img as PNG to the debug/ folder with a timestamped
+// filename. No-op when DebugSaveScreenshots is false.
 func debugSaveScreenshot(img image.Image, suffix string) {
 	if !DebugSaveScreenshots {
 		return
@@ -151,7 +154,7 @@ func SetHotkey(keyName string) {
 func WatchHotkey() {
 	keyName := GetHotkeyName(currentHotkey)
 	registerGlobalHotkey(currentHotkey)
-	debugLog("[HOTKEY] Watching for %s key (polling)...\n", keyName)
+	fmt.Printf("[READY] Press %s to capture screenshots\n", keyName)
 
 	var lastState int16 = 0
 
@@ -167,7 +170,7 @@ func WatchHotkey() {
 		// Detect key press (transition from not pressed to pressed)
 		// High bit set = negative in int16, so state < 0 means key is down
 		if state < 0 && lastState >= 0 {
-			debugLog("[HOTKEY] %s pressed!\n", keyName)
+			fmt.Println("[SCREENSHOT] Captured!")
 			go captureScreen()
 		}
 
@@ -190,7 +193,9 @@ func GetHotkeyName(vk uintptr) string {
 	return fmt.Sprintf("Unknown (0x%02X)", vk)
 }
 
-// captureScreen takes a screenshot directly (no clipboard involved)
+// captureScreen takes a screenshot of the display where Tarkov is running
+// and adds it to the batch. Uses the screenshot library directly instead
+// of the clipboard.
 func captureScreen() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -242,7 +247,8 @@ func captureScreen() {
 	addToBatch(img)
 }
 
-// addToBatch adds the captured image to the batch
+// addToBatch validates the captured image (size, aspect ratio, re-capture)
+// and adds it to the current batch. Resets the 20-second batch timer.
 func addToBatch(img image.Image) {
 	width := img.Bounds().Dx()
 	height := img.Bounds().Dy()
@@ -285,7 +291,7 @@ func addToBatch(img image.Image) {
 
 	batchImages = append(batchImages, img)
 	count := len(batchImages)
-	debugLog("[BATCH] Image %d added to batch\n", count)
+	fmt.Printf("[BATCH] Screenshot %d added, waiting 20s...\n", count)
 
 	if count == 1 {
 		showBalloon("Screenshot captured", "Waiting 20s for more screenshots...")

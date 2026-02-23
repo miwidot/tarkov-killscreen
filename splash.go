@@ -1,3 +1,8 @@
+// splash.go - Startup Splash Screen
+//
+// Displays the application logo as a centered popup window on startup.
+// The splash is shown for 750ms and can be dismissed by clicking.
+// Uses the embedded logo.png, scaled to 40% of original size.
 package main
 
 import (
@@ -19,6 +24,8 @@ var splashHwnd win.HWND
 var splashWidth, splashHeight int
 var splashDone chan struct{}
 
+// ShowSplash displays the logo as a centered, borderless popup window.
+// The splash auto-closes after 750ms or on click.
 func ShowSplash() {
 	// Load logo
 	f, err := logoFS.Open("logo.png")

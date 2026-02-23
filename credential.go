@@ -32,6 +32,7 @@ const (
 	CRED_PERSIST_LOCAL_MACHINE = 2
 )
 
+// CREDENTIAL represents a Windows Credential Manager entry (CREDENTIALW struct).
 type CREDENTIAL struct {
 	Flags              uint32
 	Type               uint32
@@ -49,6 +50,7 @@ type CREDENTIAL struct {
 
 const credentialTarget = "TarkovScreenshoter_APIToken"
 
+// SaveToken stores the API token in Windows Credential Manager.
 func SaveToken(token string) error {
 	targetName, _ := syscall.UTF16PtrFromString(credentialTarget)
 	userName, _ := syscall.UTF16PtrFromString("api_token")
@@ -71,6 +73,7 @@ func SaveToken(token string) error {
 	return nil
 }
 
+// LoadToken retrieves the API token from Windows Credential Manager.
 func LoadToken() (string, error) {
 	targetName, _ := syscall.UTF16PtrFromString(credentialTarget)
 
@@ -95,6 +98,7 @@ func LoadToken() (string, error) {
 	return string(token), nil
 }
 
+// DeleteToken removes the API token from Windows Credential Manager.
 func DeleteToken() error {
 	targetName, _ := syscall.UTF16PtrFromString(credentialTarget)
 
@@ -110,6 +114,7 @@ func DeleteToken() error {
 	return nil
 }
 
+// HasToken returns true if a non-empty API token exists in Credential Manager.
 func HasToken() bool {
 	token, err := LoadToken()
 	return err == nil && token != ""

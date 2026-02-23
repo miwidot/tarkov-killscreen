@@ -1,3 +1,8 @@
+// icon.go - System Tray Icon
+//
+// Generates a 32x32 crosshair icon for the system tray notification area.
+// The icon is created programmatically using orange/dark-orange colors
+// to match the Tarkov aesthetic.
 package main
 
 import (

@@ -17,7 +17,9 @@ import (
 	"image"
 	"os"
 	"sync"
+	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/lxn/walk"
 )
@@ -40,28 +42,92 @@ var (
 	pendingImages []image.Image
 )
 
-func printBanner() {
-	banner := `
-  ╔══════════════════════════════════════════════════════╗
-  ║                                                      ║
-  ║   ▄▄▄▄▄▄▄  ▄▄▄▄▄▄   ▄▄▄▄▄▄▄  ▄     ▄  ▄▄▄▄▄▄▄    ║
-  ║      █     █      █  █     █  █     █  █     █     ║
-  ║      █     █▄▄▄▄▄▄▀  █▄▄▄▄▄█  █▄▄▄▄▄█  █▄▄▄▄▄█     ║
-  ║      █     █      █  █   █    █     █        █      ║
-  ║      █     █      █  █    █   █     █   ▄▄▄▄▄█      ║
-  ║                                                      ║
-  ║   ─── S T A M M T I S C H  ─────────────────────    ║
-  ║                                                      ║
-  ║        ╔═╗  █ █▀▀ █   █   ▄▀▀ ▄▀▀▄ █ █ █▄ █ ▀█▀   ║
-  ║        ╠╦╝  █▀ █  █   █   █   █  █ █ █ █ ▀█  █    ║
-  ║        ╩╚═  █  ▀▀ ▀▀▀ ▀▀▀  ▀▀ ▀▀▀  ▀▀▀ █  █  ▀    ║
-  ║                                                      ║
-  ╚══════════════════════════════════════════════════════╝`
-
-	fmt.Println(banner)
-	fmt.Printf("  Version: %s\n\n", CurrentVersion)
+// getTerminalWidth returns the current console window width in columns.
+// Falls back to 80 columns if the console info cannot be queried.
+func getTerminalWidth() int {
+	handle, _ := syscall.GetStdHandle(syscall.STD_OUTPUT_HANDLE)
+	type consoleInfo struct {
+		Size       [2]uint16
+		CursorPos  [2]uint16
+		Attributes uint16
+		Window     [4]uint16
+		MaxSize    [2]uint16
+	}
+	var info consoleInfo
+	proc := kernel32.NewProc("GetConsoleScreenBufferInfo")
+	ret, _, _ := proc.Call(uintptr(handle), uintptr(unsafe.Pointer(&info)))
+	if ret == 0 {
+		return 80
+	}
+	width := int(info.Window[2]-info.Window[0]) + 1
+	if width < 40 {
+		return 80
+	}
+	return width
 }
 
+// centerLine pads text with leading spaces so it appears centered in a
+// terminal of the given width. ANSI escape codes are stripped before
+// measuring visible length.
+func centerLine(text string, width int) string {
+	// Strip ANSI codes to measure visible length
+	visible := text
+	for {
+		start := -1
+		for i := 0; i < len(visible); i++ {
+			if visible[i] == '\033' {
+				start = i
+				break
+			}
+		}
+		if start == -1 {
+			break
+		}
+		end := start
+		for end < len(visible) && visible[end] != 'm' {
+			end++
+		}
+		if end < len(visible) {
+			visible = visible[:start] + visible[end+1:]
+		} else {
+			break
+		}
+	}
+
+	pad := (width - len(visible)) / 2
+	if pad < 0 {
+		pad = 0
+	}
+	spaces := ""
+	for i := 0; i < pad; i++ {
+		spaces += " "
+	}
+	return spaces + text
+}
+
+// printBanner prints the colored, centered startup banner to the console.
+func printBanner() {
+	enableAnsiColors()
+
+	green := "\033[32m"
+	yellow := "\033[1;33m"
+	dim := "\033[90m"
+	reset := "\033[0m"
+	w := getTerminalWidth()
+
+	fmt.Println()
+	fmt.Println(centerLine(green+"=========================================="+reset, w))
+	fmt.Println(centerLine(green+"T  A  R  K  O  V"+reset, w))
+	fmt.Println(centerLine(yellow+"-- STAMMTISCH --"+reset, w))
+	fmt.Println(centerLine(green+"K I L L C O U N T E R"+reset, w))
+	fmt.Println(centerLine(green+"=========================================="+reset, w))
+	fmt.Println(centerLine(dim+"Version: "+CurrentVersion+reset, w))
+	fmt.Println()
+}
+
+// RunApp is the main entry point for the application. It shows the splash
+// screen, loads config, creates the system tray icon, and starts the hotkey
+// watcher loop.
 func RunApp() {
 	var err error
 
@@ -112,6 +178,8 @@ func RunApp() {
 	mainWindow.Run()
 }
 
+// watchClipboardAuto polls the clipboard sequence number to detect new
+// screenshots. This is the legacy capture method, kept as fallback.
 func watchClipboardAuto() {
 	lastSeq := GetClipboardSequenceNumber()
 	debugLn("[AUTO] Watching clipboard... seq:", lastSeq)
@@ -140,6 +208,8 @@ func watchClipboardAuto() {
 	debugLn("[AUTO] Watcher stopped!")
 }
 
+// captureAndBatch reads a screenshot from the clipboard, validates it, and
+// adds it to the current batch. Used by the clipboard watcher path.
 func captureAndBatch() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -216,6 +286,9 @@ func captureAndBatch() {
 	batchMutex.Unlock()
 }
 
+// processBatch uploads all batched screenshots to the OCR API, saves any
+// detected kills, and shows the result notification. Called after the 20s
+// batch timer expires.
 func processBatch() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -235,7 +308,7 @@ func processBatch() {
 		}
 
 		batchMutex.Unlock()
-		debugLn("[BATCH] Ready for new screenshots")
+		fmt.Println("[READY] Waiting for screenshots...")
 	}()
 
 	batchMutex.Lock()
@@ -323,6 +396,8 @@ func processBatch() {
 	}
 }
 
+// buildTrayMenu populates the system tray context menu with status info,
+// a "Process Now" action, settings, and exit.
 func buildTrayMenu() {
 	statusAction := walk.NewAction()
 	hotkeyLabel := GetHotkeyName(currentHotkey)
@@ -370,6 +445,7 @@ func buildTrayMenu() {
 	notifyIcon.ContextMenu().Actions().Add(exitAction)
 }
 
+// updateTokenAction sets the tray menu label to show a masked token preview.
 func updateTokenAction(action *walk.Action) {
 	if HasToken() {
 		token, _ := LoadToken()
@@ -383,6 +459,7 @@ func updateTokenAction(action *walk.Action) {
 	}
 }
 
+// showSettings opens the settings dialog and reloads config on save.
 func showSettings() {
 	saved, _ := ShowSettingsDialog(nil, config)
 	if saved {
@@ -391,12 +468,14 @@ func showSettings() {
 	}
 }
 
+// showBalloon displays an info balloon notification from the system tray icon.
 func showBalloon(title, message string) {
 	if notifyIcon != nil {
 		notifyIcon.ShowInfo(title, message)
 	}
 }
 
+// showWarning displays a warning balloon notification from the system tray icon.
 func showWarning(title, message string) {
 	if notifyIcon != nil {
 		notifyIcon.ShowWarning(title, message)

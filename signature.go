@@ -18,7 +18,8 @@ import (
 // Magic bytes: "TRKV" (Tarkov)
 var signatureMagic = []byte{0x54, 0x52, 0x4B, 0x56}
 
-// getSignaturePositions calculates 8 pixel positions based on image dimensions
+// getSignaturePositions returns 8 pixel coordinates spread horizontally
+// near the bottom of an image, used for embedding/reading signature bytes.
 func getSignaturePositions(width, height int) []image.Point {
 	// X positions at different percentages across the width
 	xFactors := []float64{0.1, 0.3, 0.5, 0.7, 0.2, 0.4, 0.6, 0.8}
@@ -33,7 +34,8 @@ func getSignaturePositions(width, height int) []image.Point {
 	return positions
 }
 
-// generateSignatureHash creates a 4-byte hash from image metadata
+// generateSignatureHash creates a 4-byte CRC32 hash from the current
+// timestamp and image dimensions, providing per-capture uniqueness.
 func generateSignatureHash(width, height int) []byte {
 	// Combine timestamp, dimensions for uniqueness
 	data := make([]byte, 16)
