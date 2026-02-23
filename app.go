@@ -132,6 +132,7 @@ func RunApp() {
 	var err error
 
 	printBanner()
+	HideConsole()
 	ShowSplash()
 
 	// Check for updates on startup and every 30 minutes
@@ -433,6 +434,19 @@ func buildTrayMenu() {
 		go processBatch()
 	})
 	notifyIcon.ContextMenu().Actions().Add(processNowAction)
+
+	// Console toggle
+	consoleAction := walk.NewAction()
+	consoleAction.SetText(T("tray.showconsole"))
+	consoleAction.Triggered().Attach(func() {
+		ToggleConsole()
+		if consoleVisible {
+			consoleAction.SetText(T("tray.hideconsole"))
+		} else {
+			consoleAction.SetText(T("tray.showconsole"))
+		}
+	})
+	notifyIcon.ContextMenu().Actions().Add(consoleAction)
 
 	settingsAction := walk.NewAction()
 	settingsAction.SetText(T("tray.settings"))

@@ -75,9 +75,11 @@ var translations = map[string]map[string]string{
 
 		// Tray Menu
 		"tray.hotkey":       "Hotkey: %s (20s Batch)",
-		"tray.processnow":   "Jetzt verarbeiten",
-		"tray.settings":     "Einstellungen...",
-		"tray.exit":         "Beenden",
+		"tray.processnow":    "Jetzt verarbeiten",
+		"tray.showconsole":   "Konsole anzeigen",
+		"tray.hideconsole":   "Konsole ausblenden",
+		"tray.settings":      "Einstellungen...",
+		"tray.exit":          "Beenden",
 		"tray.token.notset": "Token: NICHT GESETZT",
 		"tray.tooltip":      "Tarkov Screenshoter %s - Aufnahme aktiv",
 
@@ -86,9 +88,10 @@ var translations = map[string]map[string]string{
 		"settings.token":   "API Token:",
 		"settings.enable":  "API aktivieren",
 		"settings.hotkey":  "Aufnahme-Hotkey:",
-		"settings.lang":    "Sprache:",
-		"settings.save":    "Speichern",
-		"settings.cancel":  "Abbrechen",
+		"settings.lang":      "Sprache:",
+		"settings.autostart": "Mit Windows starten",
+		"settings.save":      "Speichern",
+		"settings.cancel":    "Abbrechen",
 
 		// First-Run Dialog
 		"welcome.title":       "Willkommen beim Tarkov Killcounter!",
@@ -140,9 +143,11 @@ var translations = map[string]map[string]string{
 
 		// Tray Menu
 		"tray.hotkey":       "Hotkey: %s (20s batch)",
-		"tray.processnow":   "Process Now (skip wait)",
-		"tray.settings":     "Settings...",
-		"tray.exit":         "Exit",
+		"tray.processnow":    "Process Now (skip wait)",
+		"tray.showconsole":   "Show Console",
+		"tray.hideconsole":   "Hide Console",
+		"tray.settings":      "Settings...",
+		"tray.exit":          "Exit",
 		"tray.token.notset": "Token: NOT SET",
 		"tray.tooltip":      "Tarkov Screenshoter %s - Auto-capture active",
 
@@ -151,9 +156,10 @@ var translations = map[string]map[string]string{
 		"settings.token":   "API Token:",
 		"settings.enable":  "Enable API",
 		"settings.hotkey":  "Capture Hotkey:",
-		"settings.lang":    "Language:",
-		"settings.save":    "Save",
-		"settings.cancel":  "Cancel",
+		"settings.lang":      "Language:",
+		"settings.autostart": "Start with Windows",
+		"settings.save":      "Save",
+		"settings.cancel":    "Cancel",
 
 		// First-Run Dialog
 		"welcome.title":       "Welcome to Tarkov Killcounter!",

@@ -91,9 +91,11 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	var enabledCB *walk.CheckBox
 	var hotkeyCB *walk.ComboBox
 	var langCB *walk.ComboBox
+	var autostartCB *walk.CheckBox
 
 	newToken := currentToken
 	newEnabled := cfg.API.Enabled
+	newAutostart := GetAutostart()
 	newHotkey := cfg.Hotkeys.CaptureKey
 	if newHotkey == "" {
 		newHotkey = "PrintScreen"
@@ -166,6 +168,8 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 					}
 				},
 			},
+			VSeparator{},
+			CheckBox{AssignTo: &autostartCB, Text: T("settings.autostart"), Checked: newAutostart},
 			VSpacer{},
 			Composite{
 				Layout: HBox{},
@@ -176,6 +180,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 						OnClicked: func() {
 							newToken = tokenLE.Text()
 							newEnabled = enabledCB.Checked()
+							newAutostart = autostartCB.Checked()
 							if hotkeyCB.CurrentIndex() >= 0 {
 								newHotkey = HotkeyOptions[hotkeyCB.CurrentIndex()]
 							}
@@ -207,6 +212,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 		cfg.API.Enabled = newEnabled
 		cfg.Hotkeys.CaptureKey = newHotkey
 		cfg.Language = newLang
+		cfg.Autostart = newAutostart
 		SaveConfig(cfg)
 
 		// Apply hotkey change immediately
@@ -214,6 +220,9 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 
 		// Apply language change immediately
 		SetLanguage(newLang)
+
+		// Apply autostart change immediately
+		SetAutostart(newAutostart)
 
 		return true, nil
 	}

@@ -30,9 +30,10 @@ type APIConfig struct {
 
 // Config is the top-level application configuration, serialized as config.json.
 type Config struct {
-	Hotkeys  HotkeyConfig `json:"hotkeys"`
-	API      APIConfig    `json:"api"`
-	Language string       `json:"language"`
+	Hotkeys   HotkeyConfig `json:"hotkeys"`
+	API       APIConfig    `json:"api"`
+	Language  string       `json:"language"`
+	Autostart bool         `json:"autostart"`
 }
 
 var defaultConfig = Config{
