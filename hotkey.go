@@ -114,6 +114,10 @@ const (
 	VK_F12        = 0x7B // F12
 	VK_SCROLL     = 0x91 // Scroll Lock
 	VK_PAUSE      = 0x13 // Pause/Break
+	VK_PRIOR      = 0x21 // Page Up
+	VK_NEXT       = 0x22 // Page Down
+	VK_INSERT     = 0x2D // Insert
+	VK_DELETE     = 0x2E // Delete
 )
 
 // HotkeyOptions defines available hotkey choices for the dropdown
@@ -122,14 +126,15 @@ var HotkeyOptions = []string{
 	"F12",
 	"ScrollLock",
 	"Pause",
+	"PageUp",
+	"PageDown",
+	"Insert",
+	"Delete",
 }
 
-// HotkeyLabels maps key names to display labels
-var HotkeyLabels = map[string]string{
-	"PrintScreen": "Print Screen",
-	"F12":         "F12",
-	"ScrollLock":  "Scroll Lock",
-	"Pause":       "Pause/Break",
+// GetHotkeyLabel returns the localized display label for a hotkey name.
+func GetHotkeyLabel(name string) string {
+	return T("hotkey." + name)
 }
 
 // hotkeyToVK maps key names to virtual key codes
@@ -139,6 +144,10 @@ var hotkeyToVK = map[string]uintptr{
 	"F11":         VK_F11,
 	"ScrollLock":  VK_SCROLL,
 	"Pause":       VK_PAUSE,
+	"PageUp":      VK_PRIOR,
+	"PageDown":    VK_NEXT,
+	"Insert":      VK_INSERT,
+	"Delete":      VK_DELETE,
 }
 
 // SetHotkey updates the capture hotkey
@@ -184,10 +193,7 @@ func WatchHotkey() {
 func GetHotkeyName(vk uintptr) string {
 	for name, code := range hotkeyToVK {
 		if code == vk {
-			if label, ok := HotkeyLabels[name]; ok {
-				return label
-			}
-			return name
+			return GetHotkeyLabel(name)
 		}
 	}
 	return fmt.Sprintf("Unknown (0x%02X)", vk)

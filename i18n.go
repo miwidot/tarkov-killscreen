@@ -76,10 +76,9 @@ var translations = map[string]map[string]string{
 		// Tray Menu
 		"tray.hotkey":       "Hotkey: %s (20s Batch)",
 		"tray.processnow":    "Jetzt verarbeiten",
-		"tray.showconsole":   "Konsole anzeigen",
-		"tray.hideconsole":   "Konsole ausblenden",
 		"tray.settings":      "Einstellungen...",
 		"tray.exit":          "Beenden",
+		"tray.stats":        "Uploads: %d | Kills: %d | Fehler: %d",
 		"tray.token.notset": "Token: NICHT GESETZT",
 		"tray.tooltip":      "Tarkov Screenshoter %s - Aufnahme aktiv",
 
@@ -102,9 +101,20 @@ var translations = map[string]map[string]string{
 		"welcome.missing":     "Token fehlt",
 		"welcome.missing.msg": "Bitte gib einen API-Token ein.",
 
-		// Update Dialog
-		"update.title":   "Update verfügbar",
-		"update.message": "Eine neue Version ist verfügbar!\n\nAktuelle Version: %s\nNeue Version: %s\n\nJetzt herunterladen?",
+		// Update
+		"update.title":     "Update verfügbar",
+		"update.message":   "Eine neue Version ist verfügbar!\n\nAktuelle Version: %s\nNeue Version: %s\n\nJetzt herunterladen?",
+		"update.available": "⬆ Update: %s — Klicken zum Download",
+
+		// Hotkey Labels
+		"hotkey.PrintScreen": "Druck",
+		"hotkey.F12":         "F12",
+		"hotkey.ScrollLock":  "Rollen",
+		"hotkey.Pause":       "Pause",
+		"hotkey.PageUp":      "Bild auf",
+		"hotkey.PageDown":    "Bild ab",
+		"hotkey.Insert":      "Einfg",
+		"hotkey.Delete":      "Entf",
 
 		// Already Running
 		"already.running.title": "Tarkov Kill Screen Analyzer",
@@ -144,10 +154,9 @@ var translations = map[string]map[string]string{
 		// Tray Menu
 		"tray.hotkey":       "Hotkey: %s (20s batch)",
 		"tray.processnow":    "Process Now (skip wait)",
-		"tray.showconsole":   "Show Console",
-		"tray.hideconsole":   "Hide Console",
 		"tray.settings":      "Settings...",
 		"tray.exit":          "Exit",
+		"tray.stats":        "Uploads: %d | Kills: %d | Failed: %d",
 		"tray.token.notset": "Token: NOT SET",
 		"tray.tooltip":      "Tarkov Screenshoter %s - Auto-capture active",
 
@@ -170,9 +179,20 @@ var translations = map[string]map[string]string{
 		"welcome.missing":     "Token missing",
 		"welcome.missing.msg": "Please enter an API token.",
 
-		// Update Dialog
-		"update.title":   "Update available",
-		"update.message": "A new version is available!\n\nCurrent version: %s\nNew version: %s\n\nDownload now?",
+		// Update
+		"update.title":     "Update available",
+		"update.message":   "A new version is available!\n\nCurrent version: %s\nNew version: %s\n\nDownload now?",
+		"update.available": "⬆ Update: %s — Click to download",
+
+		// Hotkey Labels
+		"hotkey.PrintScreen": "Print Screen",
+		"hotkey.F12":         "F12",
+		"hotkey.ScrollLock":  "Scroll Lock",
+		"hotkey.Pause":       "Pause/Break",
+		"hotkey.PageUp":      "Page Up",
+		"hotkey.PageDown":    "Page Down",
+		"hotkey.Insert":      "Insert",
+		"hotkey.Delete":      "Delete",
 
 		// Already Running
 		"already.running.title": "Tarkov Kill Screen Analyzer",

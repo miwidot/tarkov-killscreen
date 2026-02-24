@@ -117,7 +117,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	// Build hotkey labels for dropdown
 	hotkeyLabels := make([]string, len(HotkeyOptions))
 	for i, opt := range HotkeyOptions {
-		hotkeyLabels[i] = HotkeyLabels[opt]
+		hotkeyLabels[i] = GetHotkeyLabel(opt)
 	}
 
 	// Find current language index

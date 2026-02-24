@@ -3,7 +3,8 @@
 // This file handles version checking and update notifications:
 // - Queries GitHub Releases API for the latest version
 // - Compares current version with latest release
-// - Shows Windows dialog if update is available
+// - On startup: shows dialog asking to download
+// - While running: blinks tray icon and adds menu entry
 // - Checks on startup and every 30 minutes
 //
 // The update check is lightweight (~1-2KB JSON response) and
@@ -22,7 +23,7 @@ import (
 )
 
 const (
-	CurrentVersion = "1.0.0-beta5"
+	CurrentVersion = "1.0.0-beta6"
 	GithubRepo     = "miwidot/tarkov-killscreen"
 )
 
@@ -33,23 +34,32 @@ type GithubRelease struct {
 	Name    string `json:"name"`
 }
 
-// StartUpdateChecker runs update check on startup and every 30 minutes
-func StartUpdateChecker() {
-	// Check immediately on startup
-	CheckForUpdates()
+var (
+	updateAvailable bool
+	latestRelease   GithubRelease
+	updateAction    *walk.Action // Tray menu update entry
+	blinkStop       chan struct{}
+)
 
-	// Then check every 30 minutes
+// StartUpdateChecker runs update check on startup (with dialog) and every
+// 30 minutes (tray icon blink only).
+func StartUpdateChecker() {
+	// Check on startup — show dialog if update found
+	checkForUpdates(true)
+
+	// Then check every 30 minutes — blink only, no dialog
 	ticker := time.NewTicker(30 * time.Minute)
 	go func() {
 		for range ticker.C {
 			debugLn("[UPDATE] Periodic check...")
-			CheckForUpdates()
+			checkForUpdates(false)
 		}
 	}()
 }
 
-// CheckForUpdates checks GitHub for a newer release
-func CheckForUpdates() {
+// checkForUpdates queries GitHub for a newer release.
+// If showDialog is true, a message box is shown. Otherwise the tray icon blinks.
+func checkForUpdates(showDialog bool) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", GithubRepo)
 
 	resp, err := http.Get(url)
@@ -73,7 +83,14 @@ func CheckForUpdates() {
 	debugLog("[UPDATE] Current: %s, Latest: %s\n", CurrentVersion, release.TagName)
 
 	if isNewerVersion(release.TagName, CurrentVersion) {
-		showUpdateDialog(release)
+		latestRelease = release
+		updateAvailable = true
+
+		if showDialog {
+			showUpdateDialog(release)
+		} else {
+			showUpdateTray(release)
+		}
 	}
 }
 
@@ -89,7 +106,6 @@ func isNewerVersion(latest, current string) bool {
 	}
 
 	// For alpha/beta versions, compare numerically if possible
-	// alpha2 vs alpha3 -> extract numbers
 	latestNum := extractVersionNumber(latest)
 	currentNum := extractVersionNumber(current)
 
@@ -104,7 +120,6 @@ func isNewerVersion(latest, current string) bool {
 // extractVersionNumber extracts the number from version strings like "alpha2", "beta3", "v1.2.3"
 func extractVersionNumber(version string) int {
 	var num int
-	// Try to find a number in the string
 	for _, c := range version {
 		if c >= '0' && c <= '9' {
 			num = num*10 + int(c-'0')
@@ -113,7 +128,7 @@ func extractVersionNumber(version string) int {
 	return num
 }
 
-// showUpdateDialog shows a Windows message box with update info
+// showUpdateDialog shows a Windows message box with update info (startup only).
 func showUpdateDialog(release GithubRelease) {
 	message := fmt.Sprintf(T("update.message"), CurrentVersion, release.TagName)
 
@@ -125,9 +140,70 @@ func showUpdateDialog(release GithubRelease) {
 	)
 
 	if result == walk.DlgCmdYes {
-		// Open browser to release page
 		openBrowser(release.HTMLURL)
 	}
+}
+
+// showUpdateTray adds an update entry to the tray menu and blinks the icon.
+func showUpdateTray(release GithubRelease) {
+	if notifyIcon == nil {
+		return
+	}
+
+	// Add update menu entry if not already present
+	if updateAction == nil {
+		updateAction = walk.NewAction()
+		updateAction.Triggered().Attach(func() {
+			openBrowser(latestRelease.HTMLURL)
+		})
+		// Insert at top of menu
+		notifyIcon.ContextMenu().Actions().Insert(0, updateAction)
+		sep := walk.NewSeparatorAction()
+		notifyIcon.ContextMenu().Actions().Insert(1, sep)
+	}
+	updateAction.SetText(fmt.Sprintf(T("update.available"), release.TagName))
+
+	// Show balloon notification
+	showBalloon(T("update.title"), fmt.Sprintf(T("update.available"), release.TagName))
+
+	// Blink tray icon
+	startIconBlink()
+}
+
+// startIconBlink alternates the tray icon between normal and an "update" icon.
+func startIconBlink() {
+	if blinkStop != nil {
+		return // Already blinking
+	}
+	blinkStop = make(chan struct{})
+
+	normalIcon, _ := walk.NewIconFromImageForDPI(createIconImage(), 96)
+	updateIcon, _ := walk.NewIconFromImageForDPI(createUpdateIconImage(), 96)
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		show := false
+		for {
+			select {
+			case <-blinkStop:
+				if notifyIcon != nil && normalIcon != nil {
+					notifyIcon.SetIcon(normalIcon)
+				}
+				return
+			case <-ticker.C:
+				if notifyIcon == nil {
+					return
+				}
+				show = !show
+				if show && updateIcon != nil {
+					notifyIcon.SetIcon(updateIcon)
+				} else if normalIcon != nil {
+					notifyIcon.SetIcon(normalIcon)
+				}
+			}
+		}
+	}()
 }
 
 // openBrowser opens the default browser with the given URL

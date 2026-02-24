@@ -40,6 +40,12 @@ var (
 
 	// Queue for screenshots taken during upload
 	pendingImages []image.Image
+
+	// Session statistics
+	totalUploaded int
+	totalKills    int
+	totalFailed   int
+	statsAction   *walk.Action // Tray menu stats line
 )
 
 // getTerminalWidth returns the current console window width in columns.
@@ -132,11 +138,7 @@ func RunApp() {
 	var err error
 
 	printBanner()
-	HideConsole()
 	ShowSplash()
-
-	// Check for updates on startup and every 30 minutes
-	go StartUpdateChecker()
 
 	config, err = LoadConfig()
 	if err != nil {
@@ -145,6 +147,9 @@ func RunApp() {
 
 	// Apply configured language
 	SetLanguage(config.Language)
+
+	// Check for updates on startup and every 30 minutes (after language is set)
+	go StartUpdateChecker()
 
 	// First run: prompt for API token if not set
 	if !HasToken() {
@@ -344,13 +349,16 @@ func processBatch() {
 
 	if len(validImages) == 0 {
 		fmt.Println("[BATCH] No valid images to upload") // User-facing error
+		totalFailed++
+		updateStatsAction()
 		showWarning(T("upload.failed"), T("batch.novalid"))
 		return
 	}
 
 	images = validImages
-	fmt.Printf("[BATCH] Processing %d images...\n", len(images)) // User-facing status
-	showBalloon(T("batch.processing"), fmt.Sprintf(T("batch.uploading"), len(images)))
+	uploadCount := len(images)
+	fmt.Printf("[BATCH] Processing %d images...\n", uploadCount) // User-facing status
+	showBalloon(T("batch.processing"), fmt.Sprintf(T("batch.uploading"), uploadCount))
 
 	var resp *OCRResponse
 	var err error
@@ -369,11 +377,14 @@ func processBatch() {
 
 	if err != nil {
 		fmt.Println("[BATCH] Error:", err)
+		totalFailed++
+		updateStatsAction()
 		showBalloon(T("error"), err.Error())
 		return
 	}
 
 	if resp != nil && resp.Success {
+		totalUploaded += uploadCount
 		summary := FormatKillSummary(resp)
 
 		// Check if some images were invalid (but we may still have valid kills)
@@ -384,6 +395,7 @@ func processBatch() {
 		fmt.Println("[BATCH] Result:", summary)
 
 		if resp.Data.TotalKills > 0 {
+			totalKills += resp.Data.TotalKills
 			// Save kills even if some images were invalid - server filters invalid ones
 			saveResp, err := SaveKills(resp, config)
 			if err != nil {
@@ -403,6 +415,8 @@ func processBatch() {
 	} else {
 		showBalloon(T("batch.done"), T("batch.nokills"))
 	}
+
+	updateStatsAction()
 }
 
 // buildTrayMenu populates the system tray context menu with status info,
@@ -419,6 +433,11 @@ func buildTrayMenu() {
 	tokenAction.SetEnabled(false)
 	notifyIcon.ContextMenu().Actions().Add(tokenAction)
 
+	statsAction = walk.NewAction()
+	updateStatsAction()
+	statsAction.SetEnabled(false)
+	notifyIcon.ContextMenu().Actions().Add(statsAction)
+
 	notifyIcon.ContextMenu().Actions().Add(walk.NewSeparatorAction())
 
 	// Process now (skip wait)
@@ -434,19 +453,6 @@ func buildTrayMenu() {
 		go processBatch()
 	})
 	notifyIcon.ContextMenu().Actions().Add(processNowAction)
-
-	// Console toggle
-	consoleAction := walk.NewAction()
-	consoleAction.SetText(T("tray.showconsole"))
-	consoleAction.Triggered().Attach(func() {
-		ToggleConsole()
-		if consoleVisible {
-			consoleAction.SetText(T("tray.hideconsole"))
-		} else {
-			consoleAction.SetText(T("tray.showconsole"))
-		}
-	})
-	notifyIcon.ContextMenu().Actions().Add(consoleAction)
 
 	settingsAction := walk.NewAction()
 	settingsAction.SetText(T("tray.settings"))
@@ -478,6 +484,17 @@ func updateTokenAction(action *walk.Action) {
 		}
 	} else {
 		action.SetText(T("tray.token.notset"))
+	}
+}
+
+// updateStatsAction refreshes the session stats line in the tray menu.
+func updateStatsAction() {
+	if statsAction != nil {
+		statsAction.SetText(fmt.Sprintf(T("tray.stats"), totalUploaded, totalKills, totalFailed))
+	}
+	// Also update tooltip with stats
+	if notifyIcon != nil {
+		notifyIcon.SetToolTip(fmt.Sprintf(T("tray.tooltip"), CurrentVersion))
 	}
 }
 
