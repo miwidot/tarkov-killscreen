@@ -5,8 +5,8 @@
 // - Hotkey settings
 // - API URL and settings
 //
-// Note: The API token is NOT stored in this file for security reasons.
-// It is stored separately in Windows Credential Manager (see credential.go).
+// The API token is primarily stored in Windows Credential Manager.
+// An encrypted backup is kept in config.json as fallback (e.g. after CCleaner).
 package main
 
 import (
@@ -30,10 +30,11 @@ type APIConfig struct {
 
 // Config is the top-level application configuration, serialized as config.json.
 type Config struct {
-	Hotkeys   HotkeyConfig `json:"hotkeys"`
-	API       APIConfig    `json:"api"`
-	Language  string       `json:"language"`
-	Autostart bool         `json:"autostart"`
+	Hotkeys        HotkeyConfig `json:"hotkeys"`
+	API            APIConfig    `json:"api"`
+	Language       string       `json:"language"`
+	Autostart      bool         `json:"autostart"`
+	EncryptedToken string       `json:"encrypted_token,omitempty"`
 }
 
 var defaultConfig = Config{
