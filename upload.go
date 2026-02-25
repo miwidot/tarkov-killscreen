@@ -226,7 +226,7 @@ func UploadScreenshot(img image.Image, cfg *Config) (*OCRResponse, error) {
 	debugLog("[UPLOAD] Auth header: Bearer %s...%s\n", token[:4], token[len(token)-4:])
 
 	// Send request with timeout
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: 45 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %v", err)
@@ -313,7 +313,7 @@ func UploadMultipleScreenshots(images []image.Image, cfg *Config) (*OCRResponse,
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	client := &http.Client{Timeout: 60 * time.Second} // Longer timeout for multiple images
+	client := &http.Client{Timeout: 120 * time.Second} // Longer timeout for multiple images
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %v", err)
@@ -444,7 +444,7 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("save request failed: %v", err)

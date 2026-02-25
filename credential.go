@@ -48,7 +48,9 @@ type CREDENTIAL struct {
 	UserName           *uint16
 }
 
-const credentialTarget = "TarkovScreenshoter_APIToken"
+// credentialTarget is set per build: release uses production key, debug uses a
+// separate key so tokens don't overwrite each other.
+var credentialTarget = "TarkovScreenshoter_APIToken"
 
 // Static AES-256 key for config.json token encryption.
 // This is obfuscation, not security — prevents casual reading of the config file.

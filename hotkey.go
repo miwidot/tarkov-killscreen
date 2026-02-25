@@ -52,9 +52,18 @@ func debugSaveScreenshot(img image.Image, suffix string) {
 	}
 
 	// Save to exe directory / debug folder
-	exe, _ := os.Executable()
+	exe, err := os.Executable()
+	if err != nil {
+		debugLog("[DEBUG] Failed to get executable path: %v\n", err)
+		return
+	}
+	exe, _ = filepath.EvalSymlinks(exe)
 	debugDir := filepath.Join(filepath.Dir(exe), "debug")
-	os.MkdirAll(debugDir, 0755)
+	debugLog("[DEBUG] Saving to: %s\n", debugDir)
+	if err := os.MkdirAll(debugDir, 0755); err != nil {
+		debugLog("[DEBUG] Failed to create debug dir: %v\n", err)
+		return
+	}
 
 	filename := fmt.Sprintf("capture_%s_%s.png", time.Now().Format("2006-01-02_15-04-05"), suffix)
 	filepath := filepath.Join(debugDir, filename)

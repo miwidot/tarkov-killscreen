@@ -104,8 +104,14 @@ func IsAlreadyRunning() bool {
 	return false
 }
 
+// skipTarkovCheck can be set to true via admin build tag to skip the process check.
+var skipTarkovCheck bool
+
 // IsTarkovRunning checks if EscapeFromTarkov.exe is currently running
 func IsTarkovRunning() bool {
+	if skipTarkovCheck {
+		return true
+	}
 	snapshot, _, err := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
 	if snapshot == 0 || snapshot == ^uintptr(0) {
 		debugLog("[TARKOV] Snapshot failed: %v\n", err)
