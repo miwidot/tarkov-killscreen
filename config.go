@@ -1,9 +1,11 @@
 // config.go - Configuration File Handling
 //
 // This file manages the application configuration stored in config.json.
-// The config file is stored next to the executable and contains:
-// - Hotkey settings
-// - API URL and settings
+// The config file is stored in %APPDATA%\TarkovKillcounter\ so it persists
+// across exe updates regardless of where the user runs the exe from.
+//
+// Migration: On first run after the update, if config.json exists next to the
+// exe but not in %APPDATA%, it is automatically moved.
 //
 // The API token is primarily stored in Windows Credential Manager.
 // An encrypted backup is kept in config.json as fallback (e.g. after CCleaner).
@@ -11,6 +13,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -63,21 +66,73 @@ var defaultConfig = Config{
 	Language: "de",
 }
 
+// getConfigDir returns the %APPDATA%\TarkovKillcounter directory.
+func getConfigDir() string {
+	appdata := os.Getenv("APPDATA")
+	if appdata == "" {
+		// Fallback: next to exe
+		exe, _ := os.Executable()
+		return filepath.Dir(exe)
+	}
+	return filepath.Join(appdata, "TarkovKillcounter")
+}
+
 func getConfigPath() string {
+	return filepath.Join(getConfigDir(), "config.json")
+}
+
+// getLegacyConfigPath returns the old config path next to the executable.
+func getLegacyConfigPath() string {
 	exe, _ := os.Executable()
 	return filepath.Join(filepath.Dir(exe), "config.json")
 }
 
-// LoadConfig reads config.json from the executable directory.
-// If the file does not exist, a default config is created and returned.
+// migrateConfigFromExeDir moves config.json from next to the exe to %APPDATA%.
+// This runs once — old file is deleted after successful migration.
+func migrateConfigFromExeDir() {
+	newPath := getConfigPath()
+	if _, err := os.Stat(newPath); err == nil {
+		return // Already exists in %APPDATA%, nothing to migrate
+	}
+
+	oldPath := getLegacyConfigPath()
+	data, err := os.ReadFile(oldPath)
+	if err != nil {
+		return // No old config either
+	}
+
+	// Create %APPDATA%\TarkovKillcounter directory
+	if err := os.MkdirAll(getConfigDir(), 0755); err != nil {
+		fmt.Printf("[CONFIG] Failed to create config dir: %v\n", err)
+		return
+	}
+
+	// Write to new location
+	if err := os.WriteFile(newPath, data, 0644); err != nil {
+		fmt.Printf("[CONFIG] Failed to migrate config: %v\n", err)
+		return
+	}
+
+	// Remove old file
+	os.Remove(oldPath)
+	fmt.Println("[CONFIG] Migrated config.json to", getConfigDir())
+}
+
+// LoadConfig reads config.json from %APPDATA%\TarkovKillcounter.
+// On first run after update, migrates from the old exe-relative location.
+// If no config exists anywhere, a default config is created and returned.
 // Missing fields in existing configs are backfilled with defaults.
 func LoadConfig() (*Config, error) {
+	// Migrate old config from exe directory to %APPDATA%
+	migrateConfigFromExeDir()
+
 	configPath := getConfigPath()
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Create default config
+			// Create config dir and default config
+			os.MkdirAll(getConfigDir(), 0755)
 			cfg := defaultConfig
 			SaveConfig(&cfg)
 			return &cfg, nil
@@ -115,7 +170,7 @@ func LoadConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-// SaveConfig writes the configuration to config.json next to the executable.
+// SaveConfig writes the configuration to config.json in %APPDATA%\TarkovKillcounter.
 func SaveConfig(cfg *Config) error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
