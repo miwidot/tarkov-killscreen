@@ -49,6 +49,8 @@ var translations = map[string]map[string]string{
 		"screenshot.batch":        "%d Screenshots im Batch. Warte 20s...",
 		"screenshot.queued":       "Screenshot in Warteschlange",
 		"screenshot.queued.count": "%d Screenshot(s) warten",
+		"screenshot.limit":        "Maximum erreicht",
+		"screenshot.limit.msg":    "Maximal %d Screenshots pro Batch. Warte auf Upload...",
 		"batch.new":               "Neuer Batch gestartet",
 		"batch.new.msg":           "%d Screenshot(s) aus Warteschlange. Warte 20s...",
 		"batch.processing":        "Verarbeitung",
@@ -89,8 +91,13 @@ var translations = map[string]map[string]string{
 		"settings.hotkey":  "Aufnahme-Hotkey:",
 		"settings.lang":      "Sprache:",
 		"settings.autostart": "Mit Windows starten",
-		"settings.save":      "Speichern",
-		"settings.cancel":    "Abbrechen",
+		"settings.feedback":      "Aufnahme-Feedback:",
+		"settings.feedback.desc": "Visuelles und akustisches Feedback beim Screenshot. Ersetzt die Windows-Benachrichtigung.",
+		"settings.flash":         "Bildschirmblitz bei Aufnahme",
+		"settings.sound":         "Ton bei Aufnahme",
+		"settings.overlay":       "Aufnahme-Overlay anzeigen",
+		"settings.save":     "Speichern",
+		"settings.cancel":   "Abbrechen",
 
 		// First-Run Dialog
 		"welcome.title":       "Willkommen beim Tarkov Killcounter!",
@@ -116,6 +123,11 @@ var translations = map[string]map[string]string{
 		"hotkey.Insert":      "Einfg",
 		"hotkey.Delete":      "Entf",
 
+		// Overlay
+		"overlay.captured": "✓ Screenshot %d aufgenommen",
+		"overlay.single":   "✓ Screenshot aufgenommen",
+		"overlay.waiting":  "Nächster in %ds...",
+
 		// Already Running
 		"already.running.title": "Tarkov Kill Screen Analyzer",
 		"already.running.msg":   "Die Anwendung läuft bereits.",
@@ -126,6 +138,8 @@ var translations = map[string]map[string]string{
 		"screenshot.waiting":      "Waiting 20s for more screenshots...",
 		"screenshot.batch":        "%d screenshots in batch. Waiting 20s...",
 		"screenshot.queued":       "Screenshot queued",
+		"screenshot.limit":        "Limit reached",
+		"screenshot.limit.msg":    "Maximum %d screenshots per batch. Waiting for upload...",
 		"screenshot.queued.count": "%d screenshot(s) waiting",
 		"batch.new":               "New batch started",
 		"batch.new.msg":           "%d screenshot(s) from queue. Waiting 20s...",
@@ -167,8 +181,13 @@ var translations = map[string]map[string]string{
 		"settings.hotkey":  "Capture Hotkey:",
 		"settings.lang":      "Language:",
 		"settings.autostart": "Start with Windows",
-		"settings.save":      "Save",
-		"settings.cancel":    "Cancel",
+		"settings.feedback":      "Capture Feedback:",
+		"settings.feedback.desc": "Visual and audio feedback on screenshot. Replaces the Windows notification.",
+		"settings.flash":         "Screen flash on capture",
+		"settings.sound":         "Sound on capture",
+		"settings.overlay":       "Show capture overlay",
+		"settings.save":     "Save",
+		"settings.cancel":   "Cancel",
 
 		// First-Run Dialog
 		"welcome.title":       "Welcome to Tarkov Killcounter!",
@@ -193,6 +212,11 @@ var translations = map[string]map[string]string{
 		"hotkey.PageDown":    "Page Down",
 		"hotkey.Insert":      "Insert",
 		"hotkey.Delete":      "Delete",
+
+		// Overlay
+		"overlay.captured": "✓ Screenshot %d captured",
+		"overlay.single":   "✓ Screenshot captured",
+		"overlay.waiting":  "Next in %ds...",
 
 		// Already Running
 		"already.running.title": "Tarkov Kill Screen Analyzer",

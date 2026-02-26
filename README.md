@@ -25,12 +25,15 @@ This is functionally identical to a user manually uploading screenshots to a web
 ## Features
 
 - **Hotkey Capture** - Press a configurable hotkey to capture screenshots directly
-- **Smart Batching** - Collects multiple screenshots within a 20-second window (for scrollable kill lists)
+- **Smart Batching** - Collects multiple screenshots within a 20-second window (for scrollable kill lists, max 10 per batch)
+- **Capture Feedback** - Screen flash, sound, and mini-overlay on capture (individually configurable)
+- **Snipping Tool Override** - Automatically disables Windows 11 Snipping Tool when PrintScreen is used
 - **OCR Analysis** - Sends screenshots to API for text extraction
 - **Kill Tracking** - Saves analyzed kills to user's profile
 - **Re-Capture Prevention** - Detects screenshots of screenshots via pixel signature
 - **System Tray** - Runs quietly in the background
 - **Auto-Update** - Notifies when new versions are available
+- **Autostart** - Optional Windows autostart
 - **i18n** - UI available in German (default) and English
 
 ## Client-Side Filters
@@ -73,17 +76,20 @@ To minimize server costs, the app filters invalid screenshots locally before upl
 screenshoter/
 ├── main.go            # Entry point, single-instance check
 ├── app.go             # Core logic: tray menu, batching, notifications
-├── hotkey.go          # Global hotkey registration, screen capture
+├── hotkey.go          # Global hotkey registration, screen capture, Snipping Tool override
 ├── clipboard.go       # Windows clipboard API (legacy fallback)
 ├── windows.go         # Windows process API (Tarkov detection, display info)
 ├── upload.go          # HTTP upload to OCR API, save kills
 ├── config.go          # Configuration file handling (config.json)
 ├── credential.go      # Windows Credential Manager (secure token storage)
-├── settings.go        # Settings dialog UI (token, hotkey, language)
+├── settings.go        # Settings dialog UI (token, hotkey, language, feedback)
 ├── i18n.go            # Internationalization (DE/EN translations)
 ├── signature.go       # Pixel signature embedding/verification
 ├── version.go         # Auto-update checker (GitHub Releases)
 ├── splash.go          # Splash screen on startup
+├── flash.go           # Screen flash effect on capture (Win32 layered window)
+├── sound.go           # Capture sound via winmm.dll
+├── overlay.go         # Mini overlay popup (dark/light theme aware)
 ├── icon.go            # Tray icon generation
 ├── log.go             # Logging utilities
 ├── debug_debug.go     # Debug build: verbose console output
@@ -134,18 +140,28 @@ Configuration is stored in `config.json` next to the executable:
     "max_width": 1920,
     "jpeg_quality": 85
   },
-  "language": "de"
+  "feedback": {
+    "flash_enabled": true,
+    "sound_enabled": true,
+    "overlay_enabled": true
+  },
+  "language": "de",
+  "autostart": false
 }
 ```
 
 | Field | Description |
 |-------|-------------|
-| `hotkeys.capture_key` | Capture hotkey: `PrintScreen`, `F12`, `ScrollLock`, or `Pause` |
+| `hotkeys.capture_key` | Capture hotkey: `PrintScreen`, `F12`, `ScrollLock`, `Pause`, `PageUp`, `PageDown`, `Insert`, `Delete` |
 | `api.enabled` | Enable/disable API uploads |
 | `api.mode` | OCR mode (always `kills`) |
 | `api.max_width` | Max image width before resize (saves bandwidth) |
 | `api.jpeg_quality` | JPEG compression quality (1-100) |
+| `feedback.flash_enabled` | Screen flash on capture |
+| `feedback.sound_enabled` | Sound on capture |
+| `feedback.overlay_enabled` | Mini overlay popup on capture |
 | `language` | UI language: `de` (German) or `en` (English) |
+| `autostart` | Start with Windows |
 
 **Note:** The API token is NOT stored in this file. It is stored securely in Windows Credential Manager.
 
@@ -170,10 +186,14 @@ The API URL is hardcoded per build and not configurable.
 |-----|----------|---------|
 | user32.dll | RegisterHotKey/UnregisterHotKey | Global hotkey registration |
 | user32.dll | GetAsyncKeyState | Hotkey polling |
+| user32.dll | CreateWindowEx/RegisterClassEx | Flash overlay, capture overlay, splash |
+| user32.dll | SetLayeredWindowAttributes | Semi-transparent flash effect |
 | user32.dll | GetClipboardSequenceNumber | Detect clipboard changes (fallback) |
 | user32.dll | OpenClipboard/CloseClipboard | Access clipboard (fallback) |
 | kernel32.dll | CreateToolhelp32Snapshot | List running processes |
 | kernel32.dll | Process32First/Next | Enumerate processes |
+| gdi32.dll | CreateSolidBrush/CreateFontIndirect | Overlay rendering |
+| winmm.dll | PlaySoundW | Capture sound feedback |
 | advapi32.dll | CredWrite/CredRead/CredDelete | Credential Manager |
 
 All APIs used are standard, documented Windows APIs. No undocumented or game-specific APIs are used.

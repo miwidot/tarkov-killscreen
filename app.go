@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -374,6 +375,7 @@ func processBatch() {
 		images[i] = nil
 	}
 	images = nil
+	debug.FreeOSMemory() // Force Go to return memory to OS
 
 	if err != nil {
 		fmt.Println("[BATCH] Error:", err)
@@ -468,6 +470,7 @@ func buildTrayMenu() {
 	exitAction.Triggered().Attach(func() {
 		watching = false
 		unregisterGlobalHotkey()
+		restoreSnippingToolPrintScreen()
 		walk.App().Exit(0)
 	})
 	notifyIcon.ContextMenu().Actions().Add(exitAction)

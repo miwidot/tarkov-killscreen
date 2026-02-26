@@ -28,13 +28,21 @@ type APIConfig struct {
 	JPEGQuality int    `json:"jpeg_quality"`
 }
 
+// FeedbackConfig controls capture feedback mechanisms.
+type FeedbackConfig struct {
+	FlashEnabled   bool `json:"flash_enabled"`
+	SoundEnabled   bool `json:"sound_enabled"`
+	OverlayEnabled bool `json:"overlay_enabled"`
+}
+
 // Config is the top-level application configuration, serialized as config.json.
 type Config struct {
-	Hotkeys        HotkeyConfig `json:"hotkeys"`
-	API            APIConfig    `json:"api"`
-	Language       string       `json:"language"`
-	Autostart      bool         `json:"autostart"`
-	EncryptedToken string       `json:"encrypted_token,omitempty"`
+	Hotkeys        HotkeyConfig   `json:"hotkeys"`
+	API            APIConfig      `json:"api"`
+	Feedback       FeedbackConfig `json:"feedback"`
+	Language       string         `json:"language"`
+	Autostart      bool           `json:"autostart"`
+	EncryptedToken string         `json:"encrypted_token,omitempty"`
 }
 
 var defaultConfig = Config{
@@ -46,6 +54,11 @@ var defaultConfig = Config{
 		Mode:        "kills",
 		MaxWidth:    1920,
 		JPEGQuality: 85,
+	},
+	Feedback: FeedbackConfig{
+		FlashEnabled:   true,
+		SoundEnabled:   true,
+		OverlayEnabled: true,
 	},
 	Language: "de",
 }
@@ -89,6 +102,14 @@ func LoadConfig() (*Config, error) {
 	}
 	if cfg.Language == "" {
 		cfg.Language = defaultConfig.Language
+	}
+
+	// Migrate old configs: if "feedback" key is missing, set defaults
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err == nil {
+		if _, ok := raw["feedback"]; !ok {
+			cfg.Feedback = defaultConfig.Feedback
+		}
 	}
 
 	return &cfg, nil

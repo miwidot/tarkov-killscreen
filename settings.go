@@ -92,10 +92,16 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	var hotkeyCB *walk.ComboBox
 	var langCB *walk.ComboBox
 	var autostartCB *walk.CheckBox
+	var flashCB *walk.CheckBox
+	var soundCB *walk.CheckBox
+	var overlayCB *walk.CheckBox
 
 	newToken := currentToken
 	newEnabled := cfg.API.Enabled
 	newAutostart := GetAutostart()
+	newFlash := cfg.Feedback.FlashEnabled
+	newSound := cfg.Feedback.SoundEnabled
+	newOverlay := cfg.Feedback.OverlayEnabled
 	newHotkey := cfg.Hotkeys.CaptureKey
 	if newHotkey == "" {
 		newHotkey = "PrintScreen"
@@ -138,7 +144,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	if err := (Dialog{
 		AssignTo: &dlg,
 		Title:    T("settings.title"),
-		MinSize:  Size{Width: 400, Height: 300},
+		MinSize:  Size{Width: 400, Height: 440},
 		Layout:   VBox{},
 		Children: []Widget{
 			Label{Text: T("settings.token")},
@@ -170,6 +176,12 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 			},
 			VSeparator{},
 			CheckBox{AssignTo: &autostartCB, Text: T("settings.autostart"), Checked: newAutostart},
+			VSeparator{},
+			Label{Text: T("settings.feedback")},
+			Label{Text: T("settings.feedback.desc"), Font: Font{PointSize: 8}, TextColor: walk.RGB(130, 130, 130)},
+			CheckBox{AssignTo: &flashCB, Text: T("settings.flash"), Checked: cfg.Feedback.FlashEnabled},
+			CheckBox{AssignTo: &soundCB, Text: T("settings.sound"), Checked: cfg.Feedback.SoundEnabled},
+			CheckBox{AssignTo: &overlayCB, Text: T("settings.overlay"), Checked: cfg.Feedback.OverlayEnabled},
 			VSpacer{},
 			Composite{
 				Layout: HBox{},
@@ -181,6 +193,9 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 							newToken = tokenLE.Text()
 							newEnabled = enabledCB.Checked()
 							newAutostart = autostartCB.Checked()
+							newFlash = flashCB.Checked()
+							newSound = soundCB.Checked()
+							newOverlay = overlayCB.Checked()
 							if hotkeyCB.CurrentIndex() >= 0 {
 								newHotkey = HotkeyOptions[hotkeyCB.CurrentIndex()]
 							}
@@ -213,6 +228,9 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 		cfg.Hotkeys.CaptureKey = newHotkey
 		cfg.Language = newLang
 		cfg.Autostart = newAutostart
+		cfg.Feedback.FlashEnabled = newFlash
+		cfg.Feedback.SoundEnabled = newSound
+		cfg.Feedback.OverlayEnabled = newOverlay
 		SaveConfig(cfg)
 
 		// Apply hotkey change immediately

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/kbinani/screenshot"
+	"golang.org/x/sys/windows/registry"
 )
 
 // DebugSaveScreenshots controls whether captured images are saved to a debug/
@@ -91,7 +92,8 @@ var (
 	hotkeyRegistered      bool
 )
 
-const hotkeyID = 1 // ID for RegisterHotKey
+const hotkeyID = 1      // ID for RegisterHotKey
+const maxBatchSize = 10 // Maximum screenshots per batch/upload
 
 // registerGlobalHotkey uses RegisterHotKey to claim Print Screen globally.
 // This prevents Windows 11 Snipping Tool from hijacking the key.
@@ -159,9 +161,57 @@ var hotkeyToVK = map[string]uintptr{
 	"Delete":      VK_DELETE,
 }
 
-// SetHotkey updates the capture hotkey
+// snippingToolRegistryKey is the registry path for the PrintScreen → Snipping Tool setting.
+const snippingToolRegistryKey = `Control Panel\Keyboard`
+const snippingToolValueName = "PrintScreenKeyForSnippingEnabled"
+
+// snippingToolDisabled tracks whether we disabled the Snipping Tool so we can restore it.
+var snippingToolDisabled bool
+
+// disableSnippingToolPrintScreen sets the registry value to prevent Windows 11
+// from hijacking PrintScreen for the Snipping Tool.
+func disableSnippingToolPrintScreen() {
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, snippingToolRegistryKey, registry.SET_VALUE)
+	if err != nil {
+		debugLog("[HOTKEY] Failed to open registry for Snipping Tool: %v\n", err)
+		return
+	}
+	defer key.Close()
+
+	if err := key.SetDWordValue(snippingToolValueName, 0); err != nil {
+		debugLog("[HOTKEY] Failed to disable Snipping Tool PrintScreen: %v\n", err)
+		return
+	}
+	snippingToolDisabled = true
+	debugLn("[HOTKEY] Disabled Snipping Tool PrintScreen via registry")
+}
+
+// restoreSnippingToolPrintScreen re-enables the Snipping Tool PrintScreen mapping.
+func restoreSnippingToolPrintScreen() {
+	if !snippingToolDisabled {
+		return
+	}
+	key, err := registry.OpenKey(registry.CURRENT_USER, snippingToolRegistryKey, registry.SET_VALUE)
+	if err != nil {
+		return
+	}
+	defer key.Close()
+
+	key.SetDWordValue(snippingToolValueName, 1)
+	snippingToolDisabled = false
+	debugLn("[HOTKEY] Restored Snipping Tool PrintScreen via registry")
+}
+
+// SetHotkey updates the capture hotkey. When PrintScreen is selected,
+// the Windows 11 Snipping Tool is automatically disabled via registry.
 func SetHotkey(keyName string) {
 	if vk, ok := hotkeyToVK[keyName]; ok {
+		// Manage Snipping Tool registry based on hotkey
+		if vk == VK_SNAPSHOT {
+			disableSnippingToolPrintScreen()
+		} else {
+			restoreSnippingToolPrintScreen()
+		}
 		currentHotkey = vk
 		registerGlobalHotkey(vk)
 		debugLog("[HOTKEY] Set capture key to: %s\n", keyName)
@@ -281,9 +331,8 @@ func addToBatch(img image.Image) {
 		return
 	}
 
-	// Embed our signature
+	// Embed our signature (creates a copy — original can be GC'd after this)
 	signedImg := EmbedSignature(img)
-	img = signedImg // Use signed image from here
 
 	// Check aspect ratio
 	aspectRatio := float64(width) / float64(height)
@@ -296,22 +345,44 @@ func addToBatch(img image.Image) {
 	batchMutex.Lock()
 
 	if batchUploading {
-		pendingImages = append(pendingImages, img)
+		if len(pendingImages) >= maxBatchSize {
+			fmt.Printf("[PENDING] Limit reached (%d), ignoring screenshot\n", maxBatchSize)
+			batchMutex.Unlock()
+			PlayCaptureSound()
+			showWarning(T("screenshot.limit"), fmt.Sprintf(T("screenshot.limit.msg"), maxBatchSize))
+			return
+		}
+		pendingImages = append(pendingImages, signedImg)
 		count := len(pendingImages)
 		debugLog("[PENDING] Image %d added to pending queue\n", count)
-		showBalloon(T("screenshot.queued"), fmt.Sprintf(T("screenshot.queued.count"), count))
+		triggerCaptureFeedback(count)
 		batchMutex.Unlock()
 		return
 	}
 
-	batchImages = append(batchImages, img)
-	count := len(batchImages)
-	fmt.Printf("[BATCH] Screenshot %d added, waiting 20s...\n", count)
+	if len(batchImages) >= maxBatchSize {
+		fmt.Printf("[BATCH] Limit reached (%d), ignoring screenshot\n", maxBatchSize)
+		batchMutex.Unlock()
+		PlayCaptureSound()
+		showWarning(T("screenshot.limit"), fmt.Sprintf(T("screenshot.limit.msg"), maxBatchSize))
+		return
+	}
 
-	if count == 1 {
-		showBalloon(T("screenshot.captured"), T("screenshot.waiting"))
-	} else {
-		showBalloon(T("screenshot.captured"), fmt.Sprintf(T("screenshot.batch"), count))
+	batchImages = append(batchImages, signedImg)
+	count := len(batchImages)
+	fmt.Printf("[BATCH] Screenshot %d/%d added, waiting 20s...\n", count, maxBatchSize)
+
+	triggerCaptureFeedback(count)
+
+	// At max: start upload immediately instead of waiting
+	if count >= maxBatchSize {
+		fmt.Println("[BATCH] Max reached, processing immediately...")
+		if batchTimer != nil {
+			batchTimer.Stop()
+		}
+		batchTimer = time.AfterFunc(1*time.Second, processBatch)
+		batchMutex.Unlock()
+		return
 	}
 
 	// Reset timer
@@ -321,4 +392,29 @@ func addToBatch(img image.Image) {
 	batchTimer = time.AfterFunc(batchWaitTime, processBatch)
 
 	batchMutex.Unlock()
+}
+
+// triggerCaptureFeedback fires the configured feedback mechanisms (flash,
+// sound, overlay) and falls back to a balloon notification if overlay is off.
+func triggerCaptureFeedback(count int) {
+	if config == nil {
+		return
+	}
+	if config.Feedback.FlashEnabled {
+		ShowFlash()
+	}
+	if config.Feedback.SoundEnabled {
+		PlayCaptureSound()
+	}
+	if config.Feedback.OverlayEnabled {
+		ShowOverlay(count)
+	}
+	if !config.Feedback.OverlayEnabled {
+		// Fallback: balloon notification
+		if count == 1 {
+			showBalloon(T("screenshot.captured"), T("screenshot.waiting"))
+		} else {
+			showBalloon(T("screenshot.captured"), fmt.Sprintf(T("screenshot.batch"), count))
+		}
+	}
 }
