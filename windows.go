@@ -17,6 +17,8 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"syscall"
@@ -26,6 +28,7 @@ import (
 var (
 	user32   = syscall.NewLazyDLL("user32.dll")
 	kernel32 = syscall.NewLazyDLL("kernel32.dll")
+	shell32  = syscall.NewLazyDLL("shell32.dll")
 
 	procCreateToolhelp32Snapshot = kernel32.NewProc("CreateToolhelp32Snapshot")
 	procProcess32FirstW          = kernel32.NewProc("Process32FirstW")
@@ -39,6 +42,9 @@ var (
 	procGetWindowRect            = user32.NewProc("GetWindowRect")
 	procMonitorFromWindow        = user32.NewProc("MonitorFromWindow")
 	procGetMonitorInfoW          = user32.NewProc("GetMonitorInfoW")
+	procOpenProcessToken         = advapi32.NewProc("OpenProcessToken")
+	procGetTokenInformation      = advapi32.NewProc("GetTokenInformation")
+	procShellExecuteW            = shell32.NewProc("ShellExecuteW")
 )
 
 const (
@@ -409,4 +415,68 @@ func IsImageViewerRunning() (bool, string) {
 	}
 
 	return false, ""
+}
+
+// isElevated checks if the current process is running with admin (elevated) privileges.
+// Uses advapi32 OpenProcessToken + GetTokenInformation(TokenElevation).
+func isElevated() bool {
+	handle, err := syscall.GetCurrentProcess()
+	if err != nil {
+		return false
+	}
+
+	var token syscall.Token
+	ret, _, _ := procOpenProcessToken.Call(
+		uintptr(handle),
+		syscall.TOKEN_QUERY,
+		uintptr(unsafe.Pointer(&token)),
+	)
+	if ret == 0 {
+		return false
+	}
+	defer token.Close()
+
+	// TokenElevation class = 20, returns a uint32 (0 = not elevated, nonzero = elevated)
+	var elevation uint32
+	var returnLen uint32
+	ret, _, _ = procGetTokenInformation.Call(
+		uintptr(token),
+		20, // TokenElevation
+		uintptr(unsafe.Pointer(&elevation)),
+		4,
+		uintptr(unsafe.Pointer(&returnLen)),
+	)
+	if ret == 0 {
+		return false
+	}
+
+	return elevation != 0
+}
+
+// restartAsAdmin re-launches the current executable with "runas" verb (UAC prompt)
+// and exits the current process.
+func restartAsAdmin() error {
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("os.Executable: %w", err)
+	}
+
+	verb, _ := syscall.UTF16PtrFromString("runas")
+	file, _ := syscall.UTF16PtrFromString(exe)
+	// SW_SHOWNORMAL = 1
+	ret, _, _ := procShellExecuteW.Call(
+		0,
+		uintptr(unsafe.Pointer(verb)),
+		uintptr(unsafe.Pointer(file)),
+		0, // no parameters
+		0, // no directory
+		1, // SW_SHOWNORMAL
+	)
+	// ShellExecuteW returns > 32 on success
+	if ret <= 32 {
+		return fmt.Errorf("ShellExecuteW returned %d", ret)
+	}
+
+	os.Exit(0)
+	return nil // unreachable
 }

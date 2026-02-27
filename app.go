@@ -190,6 +190,11 @@ func RunApp() {
 	hotkeyName := GetHotkeyName(currentHotkey)
 	showBalloon("Tarkov Screenshoter "+CurrentVersion, fmt.Sprintf(T("ready.capture"), hotkeyName))
 
+	// Warn if Tarkov is running elevated but we are not
+	if !isElevated() && IsTarkovRunning() {
+		showWarning("Tarkov Screenshoter", T("admin.hint"))
+	}
+
 	mainWindow.Run()
 }
 
@@ -462,6 +467,18 @@ func buildTrayMenu() {
 		showSettings()
 	})
 	notifyIcon.ContextMenu().Actions().Add(settingsAction)
+
+	// Show "Restart as Admin" when not elevated
+	if !isElevated() {
+		adminAction := walk.NewAction()
+		adminAction.SetText(T("tray.admin"))
+		adminAction.Triggered().Attach(func() {
+			if err := restartAsAdmin(); err != nil {
+				showWarning(T("admin.restart.failed"), err.Error())
+			}
+		})
+		notifyIcon.ContextMenu().Actions().Add(adminAction)
+	}
 
 	notifyIcon.ContextMenu().Actions().Add(walk.NewSeparatorAction())
 

@@ -128,6 +128,11 @@ var translations = map[string]map[string]string{
 		"overlay.single":   "✓ Screenshot aufgenommen",
 		"overlay.waiting":  "Nächster in %ds...",
 
+		// Admin / Elevation
+		"tray.admin":          "Als Admin neu starten",
+		"admin.hint":          "Tarkov läuft als Admin. Hotkey funktioniert evtl. nicht ohne Admin-Rechte.",
+		"admin.restart.failed": "Neustart fehlgeschlagen",
+
 		// Already Running
 		"already.running.title": "Tarkov Kill Screen Analyzer",
 		"already.running.msg":   "Die Anwendung läuft bereits.",
@@ -217,6 +222,11 @@ var translations = map[string]map[string]string{
 		"overlay.captured": "✓ Screenshot %d captured",
 		"overlay.single":   "✓ Screenshot captured",
 		"overlay.waiting":  "Next in %ds...",
+
+		// Admin / Elevation
+		"tray.admin":          "Restart as Admin",
+		"admin.hint":          "Tarkov runs as admin. Hotkey may not work without admin rights.",
+		"admin.restart.failed": "Restart failed",
 
 		// Already Running
 		"already.running.title": "Tarkov Kill Screen Analyzer",
