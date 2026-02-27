@@ -18,6 +18,7 @@ package main
 
 import (
 	"strings"
+	"sync"
 	"syscall"
 	"unsafe"
 )
@@ -145,13 +146,39 @@ func IsTarkovRunning() bool {
 	return false
 }
 
-// GetTarkovDisplayIndex finds which display Tarkov is running on
-// Returns the display index (0-based) or -1 if not found
+// Callbacks registered once to avoid syscall.NewCallback memory leak
+var (
+	tarkovWindowCbOnce sync.Once
+	tarkovWindowCb     uintptr
+	tarkovWindowResult uintptr // hwnd found by callback
+	tarkovWindowPids   []uint32
+)
+
+// GetTarkovDisplayIndex finds which display Tarkov is running on.
+// Returns the display index (0-based) or -1 if not found.
 func GetTarkovDisplayIndex() int {
-	var tarkovHwnd uintptr
+	// Register callback once
+	tarkovWindowCbOnce.Do(func() {
+		tarkovWindowCb = syscall.NewCallback(func(hwnd uintptr, lParam uintptr) uintptr {
+			var pid uint32
+			procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+			for _, tarkovPid := range tarkovWindowPids {
+				if pid == tarkovPid {
+					visible, _, _ := procIsWindowVisible.Call(hwnd)
+					if visible != 0 {
+						tarkovWindowResult = hwnd
+						debugLog("[TARKOV] Found window for PID %d\n", pid)
+						return 0 // Stop enumeration
+					}
+				}
+			}
+			return 1 // Continue
+		})
+	})
 
 	// Collect ALL Tarkov process IDs (BE launcher + actual game have different PIDs)
-	var tarkovPids []uint32
+	tarkovWindowPids = nil
+	tarkovWindowResult = 0
 
 	snapshot, _, _ := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
 	if snapshot == 0 || snapshot == ^uintptr(0) {
@@ -166,41 +193,26 @@ func GetTarkovDisplayIndex() int {
 		exeName := strings.ToLower(syscall.UTF16ToString(entry.ExeFile[:]))
 		if strings.Contains(exeName, "escapefromtarkov") {
 			debugLog("[TARKOV] Found PID %d: %s\n", entry.ProcessID, exeName)
-			tarkovPids = append(tarkovPids, entry.ProcessID)
+			tarkovWindowPids = append(tarkovWindowPids, entry.ProcessID)
 		}
 		ret, _, _ = procProcess32NextW.Call(snapshot, uintptr(unsafe.Pointer(&entry)))
 	}
 	procCloseHandle.Call(snapshot)
 
-	if len(tarkovPids) == 0 {
+	if len(tarkovWindowPids) == 0 {
 		return -1
 	}
 
 	// Find a visible window belonging to any Tarkov process
-	callback := syscall.NewCallback(func(hwnd uintptr, lParam uintptr) uintptr {
-		var pid uint32
-		procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
-		for _, tarkovPid := range tarkovPids {
-			if pid == tarkovPid {
-				visible, _, _ := procIsWindowVisible.Call(hwnd)
-				if visible != 0 {
-					tarkovHwnd = hwnd
-					debugLog("[TARKOV] Found window for PID %d\n", pid)
-					return 0 // Stop enumeration
-				}
-			}
-		}
-		return 1 // Continue
-	})
-	procEnumWindows.Call(callback, 0)
+	procEnumWindows.Call(tarkovWindowCb, 0)
 
-	if tarkovHwnd == 0 {
+	if tarkovWindowResult == 0 {
 		debugLn("[TARKOV] Window not found, using display 0")
 		return 0
 	}
 
 	// Use MonitorFromWindow - works for windowed, borderless, and fullscreen
-	hMonitor, _, _ := procMonitorFromWindow.Call(tarkovHwnd, MONITOR_DEFAULTTONEAREST)
+	hMonitor, _, _ := procMonitorFromWindow.Call(tarkovWindowResult, MONITOR_DEFAULTTONEAREST)
 	if hMonitor == 0 {
 		return 0
 	}
@@ -217,16 +229,35 @@ func GetTarkovDisplayIndex() int {
 		mi.Monitor.Left, mi.Monitor.Top, mi.Monitor.Right, mi.Monitor.Bottom)
 
 	// Match monitor rect to screenshot library display index
+	// Try exact match first (all 4 corners), then nearest fallback
 	n := getNumDisplays()
 	for i := 0; i < n; i++ {
 		bounds := getDisplayBounds(i)
-		if bounds.Left == mi.Monitor.Left && bounds.Top == mi.Monitor.Top {
-			debugLog("[TARKOV] Matched to display %d\n", i)
+		if bounds.Left == mi.Monitor.Left && bounds.Top == mi.Monitor.Top &&
+			bounds.Right == mi.Monitor.Right && bounds.Bottom == mi.Monitor.Bottom {
+			debugLog("[TARKOV] Exact match: display %d\n", i)
 			return i
 		}
 	}
 
-	return 0 // Default to primary
+	// Fallback: find display with smallest distance (handles DPI scaling mismatches)
+	bestIndex := 0
+	bestDist := int64(1<<62 - 1)
+	for i := 0; i < n; i++ {
+		bounds := getDisplayBounds(i)
+		dx := int64(bounds.Left - mi.Monitor.Left)
+		dy := int64(bounds.Top - mi.Monitor.Top)
+		dist := dx*dx + dy*dy
+		debugLog("[TARKOV] Display %d: (%d,%d)-(%d,%d) dist=%d\n",
+			i, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom, dist)
+		if dist < bestDist {
+			bestDist = dist
+			bestIndex = i
+		}
+	}
+
+	debugLog("[TARKOV] Nearest match: display %d (dist=%d)\n", bestIndex, bestDist)
+	return bestIndex
 }
 
 // Helper to avoid import cycle - we'll call screenshot package from hotkey.go
@@ -305,31 +336,40 @@ var imageViewerProcesses = []string{
 	"screenpresso.exe",
 }
 
+// Callback for processHasVisibleWindow, registered once
+var (
+	visibleWindowCbOnce   sync.Once
+	visibleWindowCb       uintptr
+	visibleWindowCheckPid uint32
+	visibleWindowFound    bool
+)
+
 // processHasVisibleWindow checks if a process has any visible, non-minimized
 // windows by enumerating all top-level windows.
 func processHasVisibleWindow(processID uint32) bool {
-	hasVisible := false
+	visibleWindowCbOnce.Do(func() {
+		visibleWindowCb = syscall.NewCallback(func(hwnd uintptr, lParam uintptr) uintptr {
+			var pid uint32
+			procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
 
-	// Callback for EnumWindows
-	callback := syscall.NewCallback(func(hwnd uintptr, lParam uintptr) uintptr {
-		var pid uint32
-		procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+			if pid == visibleWindowCheckPid {
+				visible, _, _ := procIsWindowVisible.Call(hwnd)
+				minimized, _, _ := procIsIconic.Call(hwnd)
 
-		if pid == uint32(lParam) {
-			visible, _, _ := procIsWindowVisible.Call(hwnd)
-			minimized, _, _ := procIsIconic.Call(hwnd)
-
-			// Only count as visible if window is visible AND not minimized
-			if visible != 0 && minimized == 0 {
-				hasVisible = true
-				return 0 // Stop enumeration
+				// Only count as visible if window is visible AND not minimized
+				if visible != 0 && minimized == 0 {
+					visibleWindowFound = true
+					return 0 // Stop enumeration
+				}
 			}
-		}
-		return 1 // Continue enumeration
+			return 1 // Continue enumeration
+		})
 	})
 
-	procEnumWindows.Call(callback, uintptr(processID))
-	return hasVisible
+	visibleWindowCheckPid = processID
+	visibleWindowFound = false
+	procEnumWindows.Call(visibleWindowCb, 0)
+	return visibleWindowFound
 }
 
 // IsImageViewerRunning checks if any image viewer/editor has a visible window
