@@ -94,8 +94,9 @@ var translations = map[string]map[string]string{
 		"settings.feedback":      "Aufnahme-Feedback:",
 		"settings.feedback.desc": "Visuelles und akustisches Feedback beim Screenshot. Ersetzt die Windows-Benachrichtigung.",
 		"settings.flash":         "Bildschirmblitz bei Aufnahme",
-		"settings.sound":         "Ton bei Aufnahme",
-		"settings.overlay":       "Aufnahme-Overlay anzeigen",
+		"settings.sound":             "Bestätigungston abspielen",
+		"settings.overlay":           "Aufnahme-Overlay anzeigen",
+		"settings.overlay.duration":  "Overlay-Dauer (Sekunden):",
 		"settings.save":     "Speichern",
 		"settings.cancel":   "Abbrechen",
 
@@ -124,9 +125,10 @@ var translations = map[string]map[string]string{
 		"hotkey.Delete":      "Entf",
 
 		// Overlay
-		"overlay.captured": "✓ Screenshot %d aufgenommen",
-		"overlay.single":   "✓ Screenshot aufgenommen",
-		"overlay.waiting":  "Nächster in %ds...",
+		"overlay.captured":       "✓ Screenshot %d aufgenommen",
+		"overlay.single":         "✓ Screenshot aufgenommen",
+		"overlay.waiting":        "Nächster in %ds...",
+		"overlay.upload.failed":  "✗ Upload fehlgeschlagen",
 
 		// Admin / Elevation
 		"tray.admin":          "Als Admin neu starten",
@@ -189,8 +191,9 @@ var translations = map[string]map[string]string{
 		"settings.feedback":      "Capture Feedback:",
 		"settings.feedback.desc": "Visual and audio feedback on screenshot. Replaces the Windows notification.",
 		"settings.flash":         "Screen flash on capture",
-		"settings.sound":         "Sound on capture",
-		"settings.overlay":       "Show capture overlay",
+		"settings.sound":             "Play confirmation sound",
+		"settings.overlay":           "Show capture overlay",
+		"settings.overlay.duration":  "Overlay duration (seconds):",
 		"settings.save":     "Save",
 		"settings.cancel":   "Cancel",
 
@@ -219,9 +222,10 @@ var translations = map[string]map[string]string{
 		"hotkey.Delete":      "Delete",
 
 		// Overlay
-		"overlay.captured": "✓ Screenshot %d captured",
-		"overlay.single":   "✓ Screenshot captured",
-		"overlay.waiting":  "Next in %ds...",
+		"overlay.captured":       "✓ Screenshot %d captured",
+		"overlay.single":         "✓ Screenshot captured",
+		"overlay.waiting":        "Next in %ds...",
+		"overlay.upload.failed":  "✗ Upload failed",
 
 		// Admin / Elevation
 		"tray.admin":          "Restart as Admin",

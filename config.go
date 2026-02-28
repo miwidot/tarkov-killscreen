@@ -36,6 +36,7 @@ type FeedbackConfig struct {
 	FlashEnabled   bool `json:"flash_enabled"`
 	SoundEnabled   bool `json:"sound_enabled"`
 	OverlayEnabled bool `json:"overlay_enabled"`
+	OverlayDuration int  `json:"overlay_duration"`
 }
 
 // Config is the top-level application configuration, serialized as config.json.
@@ -59,9 +60,10 @@ var defaultConfig = Config{
 		JPEGQuality: 85,
 	},
 	Feedback: FeedbackConfig{
-		FlashEnabled:   true,
-		SoundEnabled:   true,
-		OverlayEnabled: true,
+		FlashEnabled:    true,
+		SoundEnabled:    true,
+		OverlayEnabled:  true,
+		OverlayDuration: 3,
 	},
 	Language: "de",
 }
@@ -165,6 +167,11 @@ func LoadConfig() (*Config, error) {
 		if _, ok := raw["feedback"]; !ok {
 			cfg.Feedback = defaultConfig.Feedback
 		}
+	}
+
+	// Backfill overlay duration for configs that predate this field
+	if cfg.Feedback.OverlayDuration == 0 {
+		cfg.Feedback.OverlayDuration = defaultConfig.Feedback.OverlayDuration
 	}
 
 	return &cfg, nil

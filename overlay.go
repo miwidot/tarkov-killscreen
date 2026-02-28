@@ -140,11 +140,19 @@ func HideOverlay() {
 	}
 }
 
+// getOverlayDuration returns the configured overlay duration, with a fallback of 3 seconds.
+func getOverlayDuration() time.Duration {
+	if config != nil && config.Feedback.OverlayDuration > 0 {
+		return time.Duration(config.Feedback.OverlayDuration) * time.Second
+	}
+	return 3 * time.Second
+}
+
 func resetOverlayTimer() {
 	if overlayTimer != nil {
 		overlayTimer.Stop()
 	}
-	overlayTimer = time.AfterFunc(3*time.Second, func() {
+	overlayTimer = time.AfterFunc(getOverlayDuration(), func() {
 		overlayMutex.Lock()
 		hwnd := overlayHwnd
 		overlayMutex.Unlock()
@@ -152,6 +160,25 @@ func resetOverlayTimer() {
 			win.PostMessage(hwnd, win.WM_CLOSE, 0, 0)
 		}
 	})
+}
+
+// ShowOverlayMessage displays the overlay with arbitrary text on two lines.
+func ShowOverlayMessage(line1, line2 string) {
+	overlayOnce.Do(initOverlay)
+
+	overlayMutex.Lock()
+	defer overlayMutex.Unlock()
+
+	overlayLine1 = line1
+	overlayLine2 = line2
+
+	if overlayHwnd != 0 {
+		procInvalidateRect.Call(uintptr(overlayHwnd), 0, 1)
+		resetOverlayTimer()
+		return
+	}
+
+	go overlayWorker()
 }
 
 func overlayWorker() {

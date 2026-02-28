@@ -95,6 +95,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	var flashCB *walk.CheckBox
 	var soundCB *walk.CheckBox
 	var overlayCB *walk.CheckBox
+	var overlayDurationNE *walk.NumberEdit
 
 	newToken := currentToken
 	newEnabled := cfg.API.Enabled
@@ -102,6 +103,10 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	newFlash := cfg.Feedback.FlashEnabled
 	newSound := cfg.Feedback.SoundEnabled
 	newOverlay := cfg.Feedback.OverlayEnabled
+	newOverlayDuration := cfg.Feedback.OverlayDuration
+	if newOverlayDuration == 0 {
+		newOverlayDuration = 3
+	}
 	newHotkey := cfg.Hotkeys.CaptureKey
 	if newHotkey == "" {
 		newHotkey = "PrintScreen"
@@ -181,7 +186,23 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 			Label{Text: T("settings.feedback.desc"), Font: Font{PointSize: 8}, TextColor: walk.RGB(130, 130, 130)},
 			CheckBox{AssignTo: &flashCB, Text: T("settings.flash"), Checked: cfg.Feedback.FlashEnabled},
 			CheckBox{AssignTo: &soundCB, Text: T("settings.sound"), Checked: cfg.Feedback.SoundEnabled},
-			CheckBox{AssignTo: &overlayCB, Text: T("settings.overlay"), Checked: cfg.Feedback.OverlayEnabled},
+			Composite{
+				Layout: HBox{MarginsZero: true},
+				Children: []Widget{
+					CheckBox{AssignTo: &overlayCB, Text: T("settings.overlay"), Checked: cfg.Feedback.OverlayEnabled},
+					HSpacer{Size: 10},
+					Label{Text: T("settings.overlay.duration")},
+					NumberEdit{
+						AssignTo: &overlayDurationNE,
+						MinValue: 1,
+						MaxValue: 10,
+						Value:    float64(newOverlayDuration),
+						Decimals: 0,
+						MaxSize:  Size{Width: 60},
+					},
+					HSpacer{},
+				},
+			},
 			VSpacer{},
 			Composite{
 				Layout: HBox{},
@@ -196,6 +217,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 							newFlash = flashCB.Checked()
 							newSound = soundCB.Checked()
 							newOverlay = overlayCB.Checked()
+							newOverlayDuration = int(overlayDurationNE.Value())
 							if hotkeyCB.CurrentIndex() >= 0 {
 								newHotkey = HotkeyOptions[hotkeyCB.CurrentIndex()]
 							}
@@ -231,6 +253,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 		cfg.Feedback.FlashEnabled = newFlash
 		cfg.Feedback.SoundEnabled = newSound
 		cfg.Feedback.OverlayEnabled = newOverlay
+		cfg.Feedback.OverlayDuration = newOverlayDuration
 		SaveConfig(cfg)
 
 		// Apply hotkey change immediately

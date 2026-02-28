@@ -387,6 +387,9 @@ func processBatch() {
 		totalFailed++
 		updateStatsAction()
 		showBalloon(T("error"), err.Error())
+		if config.Feedback.OverlayEnabled {
+			ShowOverlayMessage(T("overlay.upload.failed"), err.Error())
+		}
 		return
 	}
 
@@ -401,6 +404,9 @@ func processBatch() {
 
 		fmt.Println("[BATCH] Result:", summary)
 
+		// Determine overlay line 1: prefer API message, fall back to default
+		overlayMsg := resp.Message
+
 		if resp.Data.TotalKills > 0 {
 			totalKills += resp.Data.TotalKills
 			// Save kills even if some images were invalid - server filters invalid ones
@@ -412,15 +418,36 @@ func processBatch() {
 				fmt.Println("[BATCH] Saved! RaidID:", saveResp.RaidID)
 				showBalloon(T("kills.saved"), summary)
 			}
+			if config.Feedback.OverlayEnabled {
+				if overlayMsg == "" {
+					overlayMsg = T("kills.saved")
+				}
+				ShowOverlayMessage(overlayMsg, summary)
+			}
 		} else if !IsValidTarkovScreenshot(resp) {
 			// No kills and invalid images - warn user
 			reason := FormatKillSummary(resp)
 			showWarning(T("not.tarkov"), reason)
+			if config.Feedback.OverlayEnabled {
+				if overlayMsg == "" {
+					overlayMsg = T("not.tarkov")
+				}
+				ShowOverlayMessage(overlayMsg, reason)
+			}
 		} else {
 			showBalloon(T("analysis.complete"), summary)
+			if config.Feedback.OverlayEnabled {
+				if overlayMsg == "" {
+					overlayMsg = T("analysis.complete")
+				}
+				ShowOverlayMessage(overlayMsg, summary)
+			}
 		}
 	} else {
 		showBalloon(T("batch.done"), T("batch.nokills"))
+		if config.Feedback.OverlayEnabled {
+			ShowOverlayMessage(T("batch.done"), T("batch.nokills"))
+		}
 	}
 
 	updateStatsAction()

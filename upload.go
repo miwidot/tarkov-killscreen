@@ -103,6 +103,8 @@ type ImagesInfo struct {
 // OCRResponse is the top-level response from the /api/ocr endpoint.
 type OCRResponse struct {
 	Success    bool        `json:"success"`
+	Status     string      `json:"status,omitempty"`
+	Message    string      `json:"message,omitempty"`
 	Mode       string      `json:"mode"`
 	Data       OCRData     `json:"data"`
 	Validation *Validation `json:"validation,omitempty"`
