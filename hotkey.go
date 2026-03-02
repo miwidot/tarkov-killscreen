@@ -275,10 +275,13 @@ func captureScreen() {
 	}
 
 	// Check if image viewer is running (re-capture prevention)
-	if isViewer, viewerName := IsImageViewerRunning(); isViewer {
-		fmt.Printf("[CAPTURE] Image viewer detected: %s - blocking to prevent re-capture\n", viewerName) // User-facing warning
-		showWarning(T("capture.blocked"), fmt.Sprintf(T("capture.closeviewer"), viewerName))
-		return
+	// Skip in admin/debug builds so developer can test with image viewers open
+	if !debugMode {
+		if isViewer, viewerName := IsImageViewerRunning(); isViewer {
+			fmt.Printf("[CAPTURE] Image viewer detected: %s - blocking to prevent re-capture\n", viewerName) // User-facing warning
+			showWarning(T("capture.blocked"), fmt.Sprintf(T("capture.closeviewer"), viewerName))
+			return
+		}
 	}
 
 	// Get the display where Tarkov is running
