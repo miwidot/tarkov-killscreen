@@ -57,10 +57,10 @@ func StartUpdateChecker() {
 	}()
 }
 
-// checkForUpdates queries GitHub for a newer release.
+// checkForUpdates queries GitHub for a newer release (including pre-releases).
 // If showDialog is true, a message box is shown. Otherwise the tray icon blinks.
 func checkForUpdates(showDialog bool) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", GithubRepo)
+	url := fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=5", GithubRepo)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -74,22 +74,34 @@ func checkForUpdates(showDialog bool) {
 		return
 	}
 
-	var release GithubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	var releases []GithubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
 		debugLn("[UPDATE] Failed to parse response:", err)
 		return
 	}
 
-	debugLog("[UPDATE] Current: %s, Latest: %s\n", CurrentVersion, release.TagName)
+	if len(releases) == 0 {
+		return
+	}
 
-	if isNewerVersion(release.TagName, CurrentVersion) {
-		latestRelease = release
+	// Find the newest release by version comparison
+	var newest *GithubRelease
+	for i := range releases {
+		if newest == nil || isNewerVersion(releases[i].TagName, newest.TagName) {
+			newest = &releases[i]
+		}
+	}
+
+	debugLog("[UPDATE] Current: %s, Latest: %s\n", CurrentVersion, newest.TagName)
+
+	if isNewerVersion(newest.TagName, CurrentVersion) {
+		latestRelease = *newest
 		updateAvailable = true
 
 		if showDialog {
-			showUpdateDialog(release)
+			showUpdateDialog(*newest)
 		} else {
-			showUpdateTray(release)
+			showUpdateTray(*newest)
 		}
 	}
 }
