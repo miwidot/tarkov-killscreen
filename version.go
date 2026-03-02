@@ -128,21 +128,27 @@ func isNewerVersion(latest, current string) bool {
 		}
 	}
 
-	// Same major.minor.patch — compare pre-release (beta number)
-	// No pre-release (stable) > any pre-release (beta)
-	if latestParts[3] == 0 && currentParts[3] > 0 {
-		return true // stable > beta
+	// Same major.minor.patch — compare pre-release
+	// No pre-release (stable) > any pre-release
+	if latestParts[4] == 0 && currentParts[4] > 0 {
+		return true // stable > any pre-release
 	}
-	if latestParts[3] > 0 && currentParts[3] == 0 {
-		return false // beta < stable
+	if latestParts[4] > 0 && currentParts[4] == 0 {
+		return false // any pre-release < stable
+	}
+	// Compare pre-release type first (rc > beta > alpha), then number
+	if latestParts[4] != currentParts[4] {
+		return latestParts[4] > currentParts[4]
 	}
 	return latestParts[3] > currentParts[3]
 }
 
-// parseVersion parses "1.0.0-beta12" into [1, 0, 0, 12].
-// Returns [major, minor, patch, preRelease]. Stable releases have preRelease=0.
-func parseVersion(version string) [4]int {
-	var parts [4]int
+// parseVersion parses "1.0.0-beta12" into [1, 0, 0, 12, 2].
+// Returns [major, minor, patch, preNum, preType].
+// preType: 0=stable, 1=alpha, 2=beta, 3=rc
+// Stable releases have preNum=0, preType=0.
+func parseVersion(version string) [5]int {
+	var parts [5]int
 
 	// Split off pre-release suffix (e.g. "-beta12")
 	base := version
@@ -158,8 +164,18 @@ func parseVersion(version string) [4]int {
 		fmt.Sscanf(segments[i], "%d", &parts[i])
 	}
 
-	// Parse pre-release number (e.g. "beta12" → 12)
+	// Parse pre-release type and number (e.g. "beta12" → type=2, num=12)
 	if preRelease != "" {
+		switch {
+		case strings.HasPrefix(preRelease, "rc"):
+			parts[4] = 3
+		case strings.HasPrefix(preRelease, "beta"):
+			parts[4] = 2
+		case strings.HasPrefix(preRelease, "alpha"):
+			parts[4] = 1
+		default:
+			parts[4] = 1
+		}
 		for _, c := range preRelease {
 			if c >= '0' && c <= '9' {
 				parts[3] = parts[3]*10 + int(c-'0')
