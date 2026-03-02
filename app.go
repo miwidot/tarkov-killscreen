@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -40,10 +41,10 @@ var (
 	// Queue for screenshots taken during upload
 	pendingImages [][]byte // Pre-compressed JPEG bytes
 
-	// Session statistics
-	totalUploaded int
-	totalKills    int
-	totalFailed   int
+	// Session statistics (atomic — written in goroutines, read on UI thread)
+	totalUploaded atomic.Int64
+	totalKills    atomic.Int64
+	totalFailed   atomic.Int64
 	statsAction   *walk.Action // Tray menu stats line
 )
 
@@ -368,7 +369,7 @@ func processBatch() {
 
 	if err != nil {
 		fmt.Println("[BATCH] Error:", err)
-		totalFailed++
+		totalFailed.Add(1)
 		updateStatsAction()
 		showBalloon(T("error"), err.Error())
 		if config.Feedback.OverlayEnabled {
@@ -378,7 +379,7 @@ func processBatch() {
 	}
 
 	if resp != nil && resp.Success {
-		totalUploaded += uploadCount
+		totalUploaded.Add(int64(uploadCount))
 		summary := FormatKillSummary(resp)
 
 		// Check if some images were invalid (but we may still have valid kills)
@@ -392,7 +393,7 @@ func processBatch() {
 		overlayMsg := resp.Message
 
 		if resp.Data.TotalKills > 0 {
-			totalKills += resp.Data.TotalKills
+			totalKills.Add(int64(resp.Data.TotalKills))
 			// Save kills even if some images were invalid - server filters invalid ones
 			saveResp, err := SaveKills(resp, config)
 			if err != nil {
@@ -521,7 +522,7 @@ func updateTokenAction(action *walk.Action) {
 // updateStatsAction refreshes the session stats line in the tray menu.
 func updateStatsAction() {
 	if statsAction != nil {
-		statsAction.SetText(fmt.Sprintf(T("tray.stats"), totalUploaded, totalKills, totalFailed))
+		statsAction.SetText(fmt.Sprintf(T("tray.stats"), totalUploaded.Load(), totalKills.Load(), totalFailed.Load()))
 	}
 	// Also update tooltip with stats
 	if notifyIcon != nil {

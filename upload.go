@@ -261,7 +261,13 @@ func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse
 
 	fmt.Printf("[UPLOAD] Uploading %d images...\n", len(jpegDatas))
 
+	// Pre-allocate buffer based on known JPEG sizes + multipart overhead
+	totalSize := 0
+	for _, d := range jpegDatas {
+		totalSize += len(d) + 256 // 256 bytes overhead per part header
+	}
 	var body bytes.Buffer
+	body.Grow(totalSize)
 	writer := multipart.NewWriter(&body)
 
 	if err := writer.WriteField("mode", cfg.API.Mode); err != nil {

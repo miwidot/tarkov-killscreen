@@ -86,6 +86,8 @@ var (
 	overlayLine2    string
 	overlayBrush    win.HBRUSH
 	overlayCurrentTheme overlayTheme
+	overlayFontBold   win.HFONT // Cached bold font for line 1
+	overlayFontNormal win.HFONT // Cached normal font for line 2
 )
 
 func initOverlay() {
@@ -194,6 +196,10 @@ func overlayWorker() {
 	hBrush, _, _ := procCreateSolidBrush.Call(colorRef)
 	overlayBrush = win.HBRUSH(hBrush)
 
+	// Create cached fonts (reused across WM_PAINT calls)
+	overlayFontBold = createOverlayFont(-16, 700)
+	overlayFontNormal = createOverlayFont(-13, 400)
+
 	className, _ := syscall.UTF16PtrFromString("TarkovOverlay")
 	windowName, _ := syscall.UTF16PtrFromString("")
 
@@ -249,6 +255,10 @@ func overlayWorker() {
 	overlayMutex.Unlock()
 
 	win.DeleteObject(win.HGDIOBJ(overlayBrush))
+	win.DeleteObject(win.HGDIOBJ(overlayFontBold))
+	win.DeleteObject(win.HGDIOBJ(overlayFontNormal))
+	overlayFontBold = 0
+	overlayFontNormal = 0
 }
 
 func createOverlayFont(height int32, weight int32) win.HFONT {
@@ -286,17 +296,15 @@ func overlayWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		win.SetTextColor(hdc, theme.textColor)
 		win.SetBkMode(hdc, win.TRANSPARENT)
 
-		// Bold font for line 1
-		hFont := createOverlayFont(-16, 700)
-		oldFont := win.SelectObject(hdc, win.HGDIOBJ(hFont))
+		// Bold font for line 1 (cached)
+		oldFont := win.SelectObject(hdc, win.HGDIOBJ(overlayFontBold))
 
 		line1Ptr, _ := syscall.UTF16PtrFromString(line1)
 		rect1 := win.RECT{Left: 15, Top: 12, Right: overlayWidth - 15, Bottom: 40}
 		win.DrawTextEx(hdc, line1Ptr, -1, &rect1, 0, nil)
 
-		// Normal font for line 2
-		hFont2 := createOverlayFont(-13, 400)
-		win.SelectObject(hdc, win.HGDIOBJ(hFont2))
+		// Normal font for line 2 (cached)
+		win.SelectObject(hdc, win.HGDIOBJ(overlayFontNormal))
 
 		// Dimmer color for line 2
 		win.SetTextColor(hdc, theme.textColorDim)
@@ -305,10 +313,8 @@ func overlayWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		rect2 := win.RECT{Left: 15, Top: 42, Right: overlayWidth - 15, Bottom: 70}
 		win.DrawTextEx(hdc, line2Ptr, -1, &rect2, 0, nil)
 
-		// Cleanup GDI
+		// Restore original font
 		win.SelectObject(hdc, oldFont)
-		win.DeleteObject(win.HGDIOBJ(hFont))
-		win.DeleteObject(win.HGDIOBJ(hFont2))
 
 		win.EndPaint(hwnd, &ps)
 		return 0

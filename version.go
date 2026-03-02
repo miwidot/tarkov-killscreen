@@ -105,27 +105,60 @@ func isNewerVersion(latest, current string) bool {
 		return false
 	}
 
-	// For alpha/beta versions, compare numerically if possible
-	latestNum := extractVersionNumber(latest)
-	currentNum := extractVersionNumber(current)
+	// Parse semver parts for proper comparison
+	latestParts := parseVersion(latest)
+	currentParts := parseVersion(current)
 
-	if latestNum > 0 && currentNum > 0 {
-		return latestNum > currentNum
-	}
-
-	// Fallback: simple string comparison
-	return latest > current
-}
-
-// extractVersionNumber extracts the number from version strings like "alpha2", "beta3", "v1.2.3"
-func extractVersionNumber(version string) int {
-	var num int
-	for _, c := range version {
-		if c >= '0' && c <= '9' {
-			num = num*10 + int(c-'0')
+	// Compare major.minor.patch first
+	for i := 0; i < 3; i++ {
+		if latestParts[i] != currentParts[i] {
+			return latestParts[i] > currentParts[i]
 		}
 	}
-	return num
+
+	// Same major.minor.patch — compare pre-release (beta number)
+	// No pre-release (stable) > any pre-release (beta)
+	if latestParts[3] == 0 && currentParts[3] > 0 {
+		return true // stable > beta
+	}
+	if latestParts[3] > 0 && currentParts[3] == 0 {
+		return false // beta < stable
+	}
+	return latestParts[3] > currentParts[3]
+}
+
+// parseVersion parses "1.0.0-beta12" into [1, 0, 0, 12].
+// Returns [major, minor, patch, preRelease]. Stable releases have preRelease=0.
+func parseVersion(version string) [4]int {
+	var parts [4]int
+
+	// Split off pre-release suffix (e.g. "-beta12")
+	base := version
+	preRelease := ""
+	if idx := strings.IndexByte(version, '-'); idx >= 0 {
+		base = version[:idx]
+		preRelease = version[idx+1:]
+	}
+
+	// Parse major.minor.patch
+	segments := strings.Split(base, ".")
+	for i := 0; i < 3 && i < len(segments); i++ {
+		fmt.Sscanf(segments[i], "%d", &parts[i])
+	}
+
+	// Parse pre-release number (e.g. "beta12" → 12)
+	if preRelease != "" {
+		for _, c := range preRelease {
+			if c >= '0' && c <= '9' {
+				parts[3] = parts[3]*10 + int(c-'0')
+			}
+		}
+		if parts[3] == 0 {
+			parts[3] = 1 // "beta" without number = 1
+		}
+	}
+
+	return parts
 }
 
 // showUpdateDialog shows a Windows message box with update info (startup only).

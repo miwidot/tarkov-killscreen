@@ -16,7 +16,7 @@ package main
 import (
 	"fmt"
 	"image"
-	"image/png"
+	"image/jpeg"
 	"os"
 	"path/filepath"
 	"time"
@@ -45,7 +45,7 @@ func init() {
 	)
 }
 
-// debugSaveScreenshot writes img as PNG to the debug/ folder with a timestamped
+// debugSaveScreenshot writes img as JPEG to the debug/ folder with a timestamped
 // filename. No-op when DebugSaveScreenshots is false.
 func debugSaveScreenshot(img image.Image, suffix string) {
 	if !DebugSaveScreenshots {
@@ -66,7 +66,7 @@ func debugSaveScreenshot(img image.Image, suffix string) {
 		return
 	}
 
-	filename := fmt.Sprintf("capture_%s_%s.png", time.Now().Format("2006-01-02_15-04-05"), suffix)
+	filename := fmt.Sprintf("capture_%s_%s.jpg", time.Now().Format("2006-01-02_15-04-05"), suffix)
 	filepath := filepath.Join(debugDir, filename)
 
 	file, err := os.Create(filepath)
@@ -76,8 +76,8 @@ func debugSaveScreenshot(img image.Image, suffix string) {
 	}
 	defer file.Close()
 
-	if err := png.Encode(file, img); err != nil {
-		debugLog("[DEBUG] Failed to encode PNG: %v\n", err)
+	if err := jpeg.Encode(file, img, &jpeg.Options{Quality: 95}); err != nil {
+		debugLog("[DEBUG] Failed to encode JPEG: %v\n", err)
 		return
 	}
 
