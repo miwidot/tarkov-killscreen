@@ -31,6 +31,12 @@ import (
 	"golang.org/x/image/draw"
 )
 
+// Shared HTTP client with connection pooling for all API requests.
+var apiClient = &http.Client{
+	Timeout:   120 * time.Second,
+	Transport: &http.Transport{MaxIdleConnsPerHost: 2},
+}
+
 // KillData represents a single kill entry returned by the OCR API.
 type KillData struct {
 	Number   int     `json:"number"`
@@ -213,8 +219,7 @@ func UploadScreenshotData(jpegData []byte, cfg *Config) (*OCRResponse, error) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	client := &http.Client{Timeout: 45 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := apiClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %v", err)
 	}
@@ -294,8 +299,7 @@ func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := apiClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %v", err)
 	}
@@ -425,8 +429,7 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := apiClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("save request failed: %v", err)
 	}
