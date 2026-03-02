@@ -11,7 +11,6 @@ import (
 	"encoding/binary"
 	"hash/crc32"
 	"image"
-	"image/color"
 	"time"
 )
 
@@ -102,20 +101,13 @@ func HasSignature(img image.Image) bool {
 	return false
 }
 
-// EmbedSignature adds our signature to the image
-// Returns a new image with the signature embedded
-func EmbedSignature(img image.Image) *image.RGBA {
+// EmbedSignature adds our signature to the image in-place.
+// The image must be *image.RGBA (which screenshot.CaptureRect returns).
+// Modifies the original image directly to avoid a full-image copy.
+func EmbedSignature(img *image.RGBA) {
 	bounds := img.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
-
-	// Create a copy as RGBA
-	rgba := image.NewRGBA(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			rgba.Set(x, y, img.At(x, y))
-		}
-	}
 
 	positions := getSignaturePositions(width, height)
 	hash := generateSignatureHash(width, height)
@@ -132,21 +124,12 @@ func EmbedSignature(img image.Image) *image.RGBA {
 			continue
 		}
 
-		original := rgba.At(x, y)
-		r, g, _, a := original.RGBA()
-
-		// Set blue channel to signature byte
-		newColor := color.RGBA{
-			R: uint8(r >> 8),
-			G: uint8(g >> 8),
-			B: signature[i],
-			A: uint8(a >> 8),
-		}
-		rgba.Set(x, y, newColor)
+		// Direct pixel access for RGBA images
+		idx := img.PixOffset(x, y)
+		img.Pix[idx+2] = signature[i] // Blue channel
 	}
 
 	debugLog("[SIGNATURE] Embedded signature at y=%d\n", height-3)
-	return rgba
 }
 
 // VerifySignature checks if an image has our signature (for upload verification)

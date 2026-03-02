@@ -312,9 +312,10 @@ func captureScreen() {
 	addToBatch(img)
 }
 
-// addToBatch validates the captured image (size, aspect ratio, re-capture)
-// and adds it to the current batch. Resets the 20-second batch timer.
-func addToBatch(img image.Image) {
+// addToBatch validates the captured image (size, aspect ratio, re-capture),
+// compresses it to JPEG immediately, and stores only the compressed bytes
+// in the batch. The raw image (~15 MB for 2K) is freed after compression.
+func addToBatch(img *image.RGBA) {
 	width := img.Bounds().Dx()
 	height := img.Bounds().Dy()
 
@@ -331,8 +332,8 @@ func addToBatch(img image.Image) {
 		return
 	}
 
-	// Embed our signature (creates a copy — original can be GC'd after this)
-	signedImg := EmbedSignature(img)
+	// Embed our signature in-place (no copy needed)
+	EmbedSignature(img)
 
 	// Check aspect ratio
 	aspectRatio := float64(width) / float64(height)
@@ -341,7 +342,15 @@ func addToBatch(img image.Image) {
 		return
 	}
 
-	// Add to batch
+	// Compress to JPEG immediately — raw image can be GC'd after this
+	jpegData, err := compressImage(img, config)
+	if err != nil {
+		fmt.Printf("[CAPTURE] Failed to compress: %v\n", err)
+		return
+	}
+	debugLog("[CAPTURE] Compressed %dx%d → %d KB\n", width, height, len(jpegData)/1024)
+
+	// Add compressed bytes to batch
 	batchMutex.Lock()
 
 	if batchUploading {
@@ -352,7 +361,7 @@ func addToBatch(img image.Image) {
 			showWarning(T("screenshot.limit"), fmt.Sprintf(T("screenshot.limit.msg"), maxBatchSize))
 			return
 		}
-		pendingImages = append(pendingImages, signedImg)
+		pendingImages = append(pendingImages, jpegData)
 		count := len(pendingImages)
 		debugLog("[PENDING] Image %d added to pending queue\n", count)
 		triggerCaptureFeedback(count)
@@ -368,7 +377,7 @@ func addToBatch(img image.Image) {
 		return
 	}
 
-	batchImages = append(batchImages, signedImg)
+	batchImages = append(batchImages, jpegData)
 	count := len(batchImages)
 	fmt.Printf("[BATCH] Screenshot %d/%d added, waiting 20s...\n", count, maxBatchSize)
 

@@ -173,61 +173,46 @@ func compressImage(img image.Image, cfg *Config) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func UploadScreenshot(img image.Image, cfg *Config) (*OCRResponse, error) {
+// UploadScreenshotData uploads pre-compressed JPEG bytes to the OCR API.
+func UploadScreenshotData(jpegData []byte, cfg *Config) (*OCRResponse, error) {
 	if !cfg.API.Enabled {
 		return nil, fmt.Errorf("API upload disabled")
 	}
 
-	// Load token from credential manager
 	token, err := LoadToken()
 	if err != nil || token == "" {
 		return nil, fmt.Errorf("no API token configured - please set token first")
 	}
-
-	// Trim any whitespace that might have been added
 	token = strings.TrimSpace(token)
 
 	debugLog("[UPLOAD] Token length: %d, first 4: %s, last 4: %s\n", len(token), token[:4], token[len(token)-4:])
 	debugLog("[UPLOAD] URL: %s, Mode: %s\n", APIURL, cfg.API.Mode)
 
-	// Compress image
-	imageData, err := compressImage(img, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to compress image: %v", err)
-	}
-
-	// Create multipart form
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 
-	// Add mode field
 	if err := writer.WriteField("mode", cfg.API.Mode); err != nil {
 		return nil, err
 	}
 
-	// Add image file
 	part, err := writer.CreateFormFile("image", "screenshot.jpg")
 	if err != nil {
 		return nil, err
 	}
-	if _, err := part.Write(imageData); err != nil {
+	if _, err := part.Write(jpegData); err != nil {
 		return nil, err
 	}
 
 	writer.Close()
 
-	// Create request
 	req, err := http.NewRequest("POST", APIURL, &body)
 	if err != nil {
 		return nil, err
 	}
 
-	authHeader := "Bearer " + token
-	req.Header.Set("Authorization", authHeader)
+	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	debugLog("[UPLOAD] Auth header: Bearer %s...%s\n", token[:4], token[len(token)-4:])
 
-	// Send request with timeout
 	client := &http.Client{Timeout: 45 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -235,7 +220,6 @@ func UploadScreenshot(img image.Image, cfg *Config) (*OCRResponse, error) {
 	}
 	defer resp.Body.Close()
 
-	// Read response
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %v", err)
@@ -244,13 +228,11 @@ func UploadScreenshot(img image.Image, cfg *Config) (*OCRResponse, error) {
 	debugLog("[UPLOAD] Response status: %d\n", resp.StatusCode)
 	debugLog("[UPLOAD] Response body: %s\n", string(respBody))
 
-	// Parse response
 	var ocrResp OCRResponse
 	if err := json.Unmarshal(respBody, &ocrResp); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %v", err)
 	}
 
-	// Check for errors
 	if resp.StatusCode != 200 {
 		if ocrResp.Error != "" {
 			return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, ocrResp.Error)
@@ -261,13 +243,13 @@ func UploadScreenshot(img image.Image, cfg *Config) (*OCRResponse, error) {
 	return &ocrResp, nil
 }
 
-// UploadMultipleScreenshots uploads multiple images in one request
-func UploadMultipleScreenshots(images []image.Image, cfg *Config) (*OCRResponse, error) {
+// UploadMultipleScreenshotData uploads multiple pre-compressed JPEG images in one request.
+func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse, error) {
 	if !cfg.API.Enabled {
 		return nil, fmt.Errorf("API upload disabled")
 	}
 
-	if len(images) == 0 {
+	if len(jpegDatas) == 0 {
 		return nil, fmt.Errorf("no images to upload")
 	}
 
@@ -277,30 +259,21 @@ func UploadMultipleScreenshots(images []image.Image, cfg *Config) (*OCRResponse,
 	}
 	token = strings.TrimSpace(token)
 
-	fmt.Printf("[UPLOAD] Uploading %d images...\n", len(images)) // User-facing status
+	fmt.Printf("[UPLOAD] Uploading %d images...\n", len(jpegDatas))
 
-	// Create multipart form
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 
-	// Add mode field
 	if err := writer.WriteField("mode", cfg.API.Mode); err != nil {
 		return nil, err
 	}
 
-	// Add all images
-	for i, img := range images {
-		imageData, err := compressImage(img, cfg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to compress image %d: %v", i, err)
-		}
-
-		// Use "images" field for multiple images
+	for i, jpegData := range jpegDatas {
 		part, err := writer.CreateFormFile("images", fmt.Sprintf("screenshot_%d.jpg", i))
 		if err != nil {
 			return nil, err
 		}
-		if _, err := part.Write(imageData); err != nil {
+		if _, err := part.Write(jpegData); err != nil {
 			return nil, err
 		}
 	}
@@ -315,7 +288,7 @@ func UploadMultipleScreenshots(images []image.Image, cfg *Config) (*OCRResponse,
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	client := &http.Client{Timeout: 120 * time.Second} // Longer timeout for multiple images
+	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %v", err)

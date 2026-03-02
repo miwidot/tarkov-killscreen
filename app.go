@@ -14,9 +14,7 @@ package main
 
 import (
 	"fmt"
-	"image"
 	"os"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -33,14 +31,14 @@ var (
 	processing bool
 
 	// Auto-batching for multi-screenshot raids
-	batchImages    []image.Image
+	batchImages    [][]byte      // Pre-compressed JPEG bytes
 	batchTimer     *time.Timer
 	batchMutex     sync.Mutex
 	batchWaitTime  = 20 * time.Second // Wait 20 seconds for more screenshots
 	batchUploading bool               // Prevent new captures during upload
 
 	// Queue for screenshots taken during upload
-	pendingImages []image.Image
+	pendingImages [][]byte // Pre-compressed JPEG bytes
 
 	// Session statistics
 	totalUploaded int
@@ -272,12 +270,19 @@ func captureAndBatch() {
 		return
 	}
 
+	// Compress to JPEG immediately — raw image can be GC'd after this
+	jpegData, compErr := compressImage(img, config)
+	if compErr != nil {
+		fmt.Printf("[AUTO] Failed to compress: %v\n", compErr)
+		return
+	}
+
 	// Now lock to add to batch or pending queue
 	batchMutex.Lock()
 
 	// Add to pending queue if uploading, otherwise add to batch
 	if batchUploading {
-		pendingImages = append(pendingImages, img)
+		pendingImages = append(pendingImages, jpegData)
 		count := len(pendingImages)
 		debugLog("[PENDING] Image %d added to pending queue (upload in progress)\n", count)
 		showBalloon(T("screenshot.queued"), fmt.Sprintf(T("screenshot.queued.count"), count))
@@ -285,8 +290,8 @@ func captureAndBatch() {
 		return
 	}
 
-	// Add image to batch
-	batchImages = append(batchImages, img)
+	// Add compressed bytes to batch
+	batchImages = append(batchImages, jpegData)
 	count := len(batchImages)
 	debugLog("[BATCH] Image %d added to batch\n", count)
 
@@ -332,55 +337,34 @@ func processBatch() {
 	}()
 
 	batchMutex.Lock()
-	images := batchImages
+	imageData := batchImages
 	batchImages = nil
 	batchTimer = nil
 	batchUploading = true
 	batchMutex.Unlock()
 
-	if len(images) == 0 {
+	if len(imageData) == 0 {
 		return
 	}
 
-	// Verify all images have our signature (safety check)
-	validImages := make([]image.Image, 0, len(images))
-	for i, img := range images {
-		if VerifySignature(img) {
-			debugLog("[SIGNATURE] Image %d verified ✓\n", i+1)
-			validImages = append(validImages, img)
-		} else {
-			debugLog("[SIGNATURE] Image %d FAILED verification, skipping\n", i+1)
-		}
-	}
-
-	if len(validImages) == 0 {
-		fmt.Println("[BATCH] No valid images to upload") // User-facing error
-		totalFailed++
-		updateStatsAction()
-		showWarning(T("upload.failed"), T("batch.novalid"))
-		return
-	}
-
-	images = validImages
-	uploadCount := len(images)
+	uploadCount := len(imageData)
 	fmt.Printf("[BATCH] Processing %d images...\n", uploadCount) // User-facing status
 	showBalloon(T("batch.processing"), fmt.Sprintf(T("batch.uploading"), uploadCount))
 
 	var resp *OCRResponse
 	var err error
 
-	if len(images) == 1 {
-		resp, err = UploadScreenshot(images[0], config)
+	if len(imageData) == 1 {
+		resp, err = UploadScreenshotData(imageData[0], config)
 	} else {
-		resp, err = UploadMultipleScreenshots(images, config)
+		resp, err = UploadMultipleScreenshotData(imageData, config)
 	}
 
-	// Clear images to free memory (~8MB per image)
-	for i := range images {
-		images[i] = nil
+	// Clear byte slices to free memory
+	for i := range imageData {
+		imageData[i] = nil
 	}
-	images = nil
-	debug.FreeOSMemory() // Force Go to return memory to OS
+	imageData = nil
 
 	if err != nil {
 		fmt.Println("[BATCH] Error:", err)
