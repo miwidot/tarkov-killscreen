@@ -226,7 +226,7 @@ func WatchHotkey() {
 
 	var lastState int16 = 0
 
-	for watching {
+	for watching.Load() {
 		time.Sleep(50 * time.Millisecond) // Poll every 50ms
 
 		// GetAsyncKeyState returns key state

@@ -170,8 +170,10 @@ func compressImage(img image.Image, cfg *Config) ([]byte, error) {
 		img = dst
 	}
 
-	// Encode as JPEG
+	// Encode as JPEG with pre-allocated buffer
+	bounds = img.Bounds()
 	var buf bytes.Buffer
+	buf.Grow(bounds.Dx() * bounds.Dy() / 4) // ~25% of raw pixels as heuristic
 	opts := &jpeg.Options{Quality: cfg.API.JPEGQuality}
 	if err := jpeg.Encode(&buf, img, opts); err != nil {
 		return nil, err

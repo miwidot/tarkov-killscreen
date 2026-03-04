@@ -28,7 +28,7 @@ var (
 	mainWindow *walk.MainWindow
 	notifyIcon *walk.NotifyIcon
 	config     *Config
-	watching   bool
+	watching   atomic.Bool
 	processing bool
 
 	// Auto-batching for multi-screenshot raids
@@ -182,7 +182,7 @@ func RunApp() {
 
 	buildTrayMenu()
 
-	watching = true
+	watching.Store(true)
 
 	// Use hotkey-based capture (registers and watches on same thread)
 	go WatchHotkey()
@@ -204,7 +204,7 @@ func watchClipboardAuto() {
 	debugLn("[AUTO] Watching clipboard... seq:", lastSeq)
 
 	ticker := 0
-	for watching {
+	for watching.Load() {
 		time.Sleep(500 * time.Millisecond)
 		ticker++
 
@@ -497,7 +497,7 @@ func buildTrayMenu() {
 	exitAction := walk.NewAction()
 	exitAction.SetText(T("tray.exit"))
 	exitAction.Triggered().Attach(func() {
-		watching = false
+		watching.Store(false)
 		unregisterGlobalHotkey()
 		restoreSnippingToolPrintScreen()
 		walk.App().Exit(0)

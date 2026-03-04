@@ -14,7 +14,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os/exec"
 	"strings"
 	"time"
@@ -62,7 +61,7 @@ func StartUpdateChecker() {
 func checkForUpdates(showDialog bool) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=5", GithubRepo)
 
-	resp, err := http.Get(url)
+	resp, err := apiClient.Get(url)
 	if err != nil {
 		debugLn("[UPDATE] Failed to check for updates:", err)
 		return
