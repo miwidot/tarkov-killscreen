@@ -520,14 +520,19 @@ func updateTokenAction(action *walk.Action) {
 }
 
 // updateStatsAction refreshes the session stats line in the tray menu.
+// Uses Synchronize to ensure UI updates run on the main thread.
 func updateStatsAction() {
-	if statsAction != nil {
-		statsAction.SetText(fmt.Sprintf(T("tray.stats"), totalUploaded.Load(), totalKills.Load(), totalFailed.Load()))
+	if mainWindow == nil {
+		return
 	}
-	// Also update tooltip with stats
-	if notifyIcon != nil {
-		notifyIcon.SetToolTip(fmt.Sprintf(T("tray.tooltip"), CurrentVersion))
-	}
+	mainWindow.Synchronize(func() {
+		if statsAction != nil {
+			statsAction.SetText(fmt.Sprintf(T("tray.stats"), totalUploaded.Load(), totalKills.Load(), totalFailed.Load()))
+		}
+		if notifyIcon != nil {
+			notifyIcon.SetToolTip(fmt.Sprintf(T("tray.tooltip"), CurrentVersion))
+		}
+	})
 }
 
 // showSettings opens the settings dialog and reloads config on save.
@@ -541,17 +546,25 @@ func showSettings() {
 }
 
 // showBalloon displays an info balloon notification from the system tray icon.
+// Uses Synchronize to ensure the call runs on the UI thread, preventing
+// notification hangs when called from goroutines (e.g. processBatch).
 func showBalloon(title, message string) {
-	if notifyIcon != nil {
-		notifyIcon.ShowInfo(title, message)
+	if notifyIcon == nil || mainWindow == nil {
+		return
 	}
+	mainWindow.Synchronize(func() {
+		notifyIcon.ShowInfo(title, message)
+	})
 }
 
 // showWarning displays a warning balloon notification from the system tray icon.
 func showWarning(title, message string) {
-	if notifyIcon != nil {
-		notifyIcon.ShowWarning(title, message)
+	if notifyIcon == nil || mainWindow == nil {
+		return
 	}
+	mainWindow.Synchronize(func() {
+		notifyIcon.ShowWarning(title, message)
+	})
 }
 
 // isValidAspectRatio checks if the aspect ratio is reasonable for a game screenshot

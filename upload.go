@@ -131,19 +131,20 @@ type SaveImageHash struct {
 
 // SaveKillsRequest is the payload sent to /api/kills/save to persist a raid.
 type SaveKillsRequest struct {
-	Map          string            `json:"map"`
-	RaidDate     string            `json:"raidDate"`
-	TotalKills   int               `json:"totalKills"`
-	PMCKills     int               `json:"pmcKills"`
-	ScavKills    int               `json:"scavKills"`
-	BossKills    int               `json:"bossKills"`
-	GuardKills   int               `json:"guardKills"`
-	CultistKills int               `json:"cultistKills"`
-	SniperKills  int               `json:"sniperKills"`
-	Headshots    int               `json:"headshots"`
-	Weapons      map[string]int    `json:"weapons"`
-	Kills        []KillData        `json:"kills"`
-	ImageHashes  []SaveImageHash   `json:"imageHashes"`
+	Map            string            `json:"map"`
+	RaidDate       string            `json:"raidDate"`
+	TotalKills     int               `json:"totalKills"`
+	PMCKills       int               `json:"pmcKills"`
+	ScavKills      int               `json:"scavKills"`
+	BossKills      int               `json:"bossKills"`
+	GuardKills     int               `json:"guardKills"`
+	CultistKills   int               `json:"cultistKills"`
+	SniperKills    int               `json:"sniperKills"`
+	Headshots      int               `json:"headshots"`
+	Weapons        map[string]int    `json:"weapons"`
+	Kills          []KillData        `json:"kills"`
+	ImageHashes    []SaveImageHash   `json:"imageHashes"`
+	ClientVersion  string            `json:"clientVersion"`
 }
 
 // SaveKillsResponse is the server's reply after saving a raid.
@@ -198,6 +199,9 @@ func UploadScreenshotData(jpegData []byte, cfg *Config) (*OCRResponse, error) {
 	writer := multipart.NewWriter(&body)
 
 	if err := writer.WriteField("mode", cfg.API.Mode); err != nil {
+		return nil, err
+	}
+	if err := writer.WriteField("client_version", CurrentVersion); err != nil {
 		return nil, err
 	}
 
@@ -276,6 +280,9 @@ func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse
 	writer := multipart.NewWriter(&body)
 
 	if err := writer.WriteField("mode", cfg.API.Mode); err != nil {
+		return nil, err
+	}
+	if err := writer.WriteField("client_version", CurrentVersion); err != nil {
 		return nil, err
 	}
 
@@ -408,7 +415,8 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 		Headshots:    ocrResp.Data.Summary.Headshots,
 		Weapons:      ocrResp.Data.Summary.Weapons,
 		Kills:        ocrResp.Data.Kills,
-		ImageHashes:  imageHashes,
+		ImageHashes:   imageHashes,
+		ClientVersion: CurrentVersion,
 	}
 
 	jsonBody, err := json.Marshal(saveReq)
