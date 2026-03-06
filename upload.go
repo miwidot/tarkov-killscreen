@@ -145,6 +145,7 @@ type SaveKillsRequest struct {
 	Kills          []KillData        `json:"kills"`
 	ImageHashes    []SaveImageHash   `json:"imageHashes"`
 	ClientVersion  string            `json:"clientVersion"`
+	KillEventID    string            `json:"killEventId,omitempty"`
 }
 
 // SaveKillsResponse is the server's reply after saving a raid.
@@ -224,6 +225,7 @@ func UploadScreenshotData(jpegData []byte, cfg *Config) (*OCRResponse, error) {
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	setDeviceHeader(req)
 
 	resp, err := apiClient.Do(req)
 	if err != nil {
@@ -239,16 +241,17 @@ func UploadScreenshotData(jpegData []byte, cfg *Config) (*OCRResponse, error) {
 	debugLog("[UPLOAD] Response status: %d\n", resp.StatusCode)
 	debugLog("[UPLOAD] Response body: %s\n", string(respBody))
 
-	var ocrResp OCRResponse
-	if err := json.Unmarshal(respBody, &ocrResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %v", err)
+	if resp.StatusCode == 403 {
+		return nil, checkDeviceLockError(respBody)
 	}
 
 	if resp.StatusCode != 200 {
-		if ocrResp.Error != "" {
-			return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, ocrResp.Error)
-		}
-		return nil, fmt.Errorf("API error: %d", resp.StatusCode)
+		return nil, parseAPIError(resp.StatusCode, respBody)
+	}
+
+	var ocrResp OCRResponse
+	if err := json.Unmarshal(respBody, &ocrResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
 	}
 
 	return &ocrResp, nil
@@ -307,6 +310,7 @@ func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	setDeviceHeader(req)
 
 	resp, err := apiClient.Do(req)
 	if err != nil {
@@ -322,16 +326,17 @@ func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse
 	debugLog("[UPLOAD] Response status: %d\n", resp.StatusCode)
 	debugLog("[UPLOAD] Response body: %s\n", string(respBody))
 
-	var ocrResp OCRResponse
-	if err := json.Unmarshal(respBody, &ocrResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %v", err)
+	if resp.StatusCode == 403 {
+		return nil, checkDeviceLockError(respBody)
 	}
 
 	if resp.StatusCode != 200 {
-		if ocrResp.Error != "" {
-			return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, ocrResp.Error)
-		}
-		return nil, fmt.Errorf("API error: %d", resp.StatusCode)
+		return nil, parseAPIError(resp.StatusCode, respBody)
+	}
+
+	var ocrResp OCRResponse
+	if err := json.Unmarshal(respBody, &ocrResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
 	}
 
 	return &ocrResp, nil
@@ -419,6 +424,7 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 		Kills:        ocrResp.Data.Kills,
 		ImageHashes:   imageHashes,
 		ClientVersion: CurrentVersion,
+		KillEventID:   GetSelectedEventID(),
 	}
 
 	jsonBody, err := json.Marshal(saveReq)
@@ -438,6 +444,7 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	setDeviceHeader(req)
 
 	resp, err := apiClient.Do(req)
 	if err != nil {
@@ -453,6 +460,10 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 	debugLog("[SAVE] Response status: %d\n", resp.StatusCode)
 	debugLog("[SAVE] Response body: %s\n", string(respBody))
 
+	if resp.StatusCode == 403 {
+		return nil, checkDeviceLockError(respBody)
+	}
+
 	var saveResp SaveKillsResponse
 	if err := json.Unmarshal(respBody, &saveResp); err != nil {
 		return nil, fmt.Errorf("failed to parse save response: %v", err)
@@ -460,6 +471,11 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 
 	if resp.StatusCode != 200 || !saveResp.Success {
 		if saveResp.Error != "" {
+			// Check for event-related errors
+			if IsEventError(saveResp.Error) {
+				go RefreshEvents()
+				return nil, fmt.Errorf("event error: %s", saveResp.Error)
+			}
 			return nil, fmt.Errorf("save error: %s", saveResp.Error)
 		}
 		return nil, fmt.Errorf("save failed: %d", resp.StatusCode)
@@ -467,4 +483,41 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 
 	fmt.Printf("[SAVE] Saved! RaidID: %s\n", saveResp.RaidID) // User-facing success
 	return &saveResp, nil
+}
+
+// parseAPIError extracts an error message from a non-200 API response.
+// Handles mixed schemas where "status" can be string or number.
+func parseAPIError(statusCode int, body []byte) error {
+	var errResp struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(body, &errResp) == nil && errResp.Error != "" {
+		return fmt.Errorf("API error (%d): %s", statusCode, errResp.Error)
+	}
+	return fmt.Errorf("API error: %d", statusCode)
+}
+
+// setDeviceHeader adds the X-Device-ID header to an outgoing request.
+func setDeviceHeader(req *http.Request) {
+	if id := GetDeviceID(); id != "" {
+		req.Header.Set("X-Device-ID", id)
+	}
+}
+
+// ErrDeviceLocked is returned when the server rejects the request because
+// the token is bound to a different device.
+var ErrDeviceLocked = fmt.Errorf("device_locked")
+
+// checkDeviceLockError checks if a 403 response is a device lock error.
+func checkDeviceLockError(respBody []byte) error {
+	var errResp struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(respBody, &errResp) == nil && errResp.Error != "" {
+		if strings.Contains(errResp.Error, "Gerät") || strings.Contains(errResp.Error, "device") {
+			return ErrDeviceLocked
+		}
+		return fmt.Errorf("%s", errResp.Error)
+	}
+	return fmt.Errorf("access denied (403)")
 }

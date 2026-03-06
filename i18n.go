@@ -97,6 +97,7 @@ var translations = map[string]map[string]string{
 		"settings.sound":             "Bestätigungston abspielen",
 		"settings.overlay":           "Aufnahme-Overlay anzeigen",
 		"settings.overlay.duration":  "Overlay-Dauer (Sekunden):",
+		"settings.event":        "Kill Event:",
 		"settings.save":     "Speichern",
 		"settings.cancel":   "Abbrechen",
 
@@ -134,6 +135,16 @@ var translations = map[string]map[string]string{
 		"tray.admin":          "Als Admin neu starten",
 		"admin.hint":          "Tarkov läuft als Admin. Hotkey funktioniert evtl. nicht ohne Admin-Rechte.",
 		"admin.restart.failed": "Neustart fehlgeschlagen",
+
+		// Events
+		"tray.event":    "Kill Event",
+		"event.none":    "Kein Event",
+		"event.refresh": "Events aktualisieren",
+		"event.error":   "Event-Fehler",
+
+		// Device Lock
+		"device.locked":       "Token gesperrt",
+		"device.locked.msg":   "Dieser Token ist an ein anderes Gerät gebunden. Bitte auf tarkov-stammtisch.de einen neuen Token erstellen.",
 
 		// Already Running
 		"already.running.title": "Tarkov Kill Screen Analyzer",
@@ -194,6 +205,7 @@ var translations = map[string]map[string]string{
 		"settings.sound":             "Play confirmation sound",
 		"settings.overlay":           "Show capture overlay",
 		"settings.overlay.duration":  "Overlay duration (seconds):",
+		"settings.event":        "Kill Event:",
 		"settings.save":     "Save",
 		"settings.cancel":   "Cancel",
 
@@ -231,6 +243,16 @@ var translations = map[string]map[string]string{
 		"tray.admin":          "Restart as Admin",
 		"admin.hint":          "Tarkov runs as admin. Hotkey may not work without admin rights.",
 		"admin.restart.failed": "Restart failed",
+
+		// Events
+		"tray.event":    "Kill Event",
+		"event.none":    "No Event",
+		"event.refresh": "Refresh Events",
+		"event.error":   "Event Error",
+
+		// Device Lock
+		"device.locked":       "Token Locked",
+		"device.locked.msg":   "This token is bound to another device. Please create a new token on tarkov-stammtisch.de.",
 
 		// Already Running
 		"already.running.title": "Tarkov Kill Screen Analyzer",

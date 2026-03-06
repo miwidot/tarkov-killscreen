@@ -13,6 +13,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -45,7 +46,9 @@ var (
 	totalUploaded atomic.Int64
 	totalKills    atomic.Int64
 	totalFailed   atomic.Int64
-	statsAction   *walk.Action // Tray menu stats line
+	statsAction    *walk.Action // Tray menu stats line
+	eventMenu      *walk.Menu  // Event submenu
+	eventMenuAction *walk.Action // Event menu parent action
 )
 
 // getTerminalWidth returns the current console window width in columns.
@@ -148,8 +151,37 @@ func RunApp() {
 	// Apply configured language
 	SetLanguage(config.Language)
 
+	// Load or generate device ID for token binding
+	LoadOrCreateDeviceID()
+
 	// Check for updates on startup and every 30 minutes (after language is set)
 	go StartUpdateChecker()
+
+	// Restore saved event selection and validate against active events
+	if config.KillEventID != "" {
+		SetSelectedEventID(config.KillEventID)
+	}
+	go func() {
+		RefreshEvents()
+		// Clear selection if saved event is no longer active
+		if id := GetSelectedEventID(); id != "" {
+			events := GetActiveEvents()
+			found := false
+			for _, e := range events {
+				if e.ID == id {
+					found = true
+					break
+				}
+			}
+			if !found {
+				fmt.Println("[EVENTS] Saved event no longer active, clearing selection")
+				SetSelectedEventID("")
+				config.KillEventID = ""
+				SaveConfig(config)
+			}
+		}
+		buildEventMenu()
+	}()
 
 	// First run: prompt for API token if not set
 	if !HasToken() {
@@ -371,6 +403,16 @@ func processBatch() {
 		fmt.Println("[BATCH] Error:", err)
 		totalFailed.Add(1)
 		updateStatsAction()
+
+		// Device lock — show clear warning with instructions
+		if errors.Is(err, ErrDeviceLocked) {
+			showWarning(T("device.locked"), T("device.locked.msg"))
+			if config.Feedback.OverlayEnabled {
+				ShowOverlayMessage(T("device.locked"), T("device.locked.msg"))
+			}
+			return
+		}
+
 		showBalloon(T("error"), err.Error())
 		if config.Feedback.OverlayEnabled {
 			ShowOverlayMessage(T("overlay.upload.failed"), err.Error())
@@ -396,6 +438,14 @@ func processBatch() {
 			totalKills.Add(int64(resp.Data.TotalKills))
 			// Save kills even if some images were invalid - server filters invalid ones
 			saveResp, err := SaveKills(resp, config)
+			if err != nil && IsEventError(err.Error()) {
+				// Event error — retry without event
+				fmt.Println("[BATCH] Event error, retrying without event:", err)
+				SetSelectedEventID("")
+				go buildEventMenu()
+				showWarning(T("event.error"), err.Error())
+				saveResp, err = SaveKills(resp, config)
+			}
 			if err != nil {
 				fmt.Println("[BATCH] Save error:", err)
 				showBalloon(T("kills.analysis"), summary+" (not saved: "+err.Error()+")")
@@ -456,6 +506,13 @@ func buildTrayMenu() {
 	updateStatsAction()
 	statsAction.SetEnabled(false)
 	notifyIcon.ContextMenu().Actions().Add(statsAction)
+
+	// Event submenu
+	eventMenu, _ = walk.NewMenu()
+	eventMenuAction = walk.NewMenuAction(eventMenu)
+	eventMenuAction.SetText(T("tray.event"))
+	notifyIcon.ContextMenu().Actions().Add(eventMenuAction)
+	go buildEventMenu()
 
 	notifyIcon.ContextMenu().Actions().Add(walk.NewSeparatorAction())
 
@@ -532,6 +589,79 @@ func updateStatsAction() {
 		if notifyIcon != nil {
 			notifyIcon.SetToolTip(fmt.Sprintf(T("tray.tooltip"), CurrentVersion))
 		}
+	})
+}
+
+// buildEventMenu populates the event submenu with active events.
+// Called async after events are fetched. Safe to call multiple times.
+func buildEventMenu() {
+	// Wait a moment for initial fetch
+	events := GetActiveEvents()
+	if mainWindow == nil {
+		return
+	}
+	mainWindow.Synchronize(func() {
+		if eventMenu == nil {
+			return
+		}
+		// Clear existing items
+		actions := eventMenu.Actions()
+		for actions.Len() > 0 {
+			actions.RemoveAt(0)
+		}
+
+		// "No Event" option
+		noEventAction := walk.NewAction()
+		if GetSelectedEventID() == "" {
+			noEventAction.SetText("✓ " + T("event.none"))
+		} else {
+			noEventAction.SetText("  " + T("event.none"))
+		}
+		noEventAction.Triggered().Attach(func() {
+			SetSelectedEventID("")
+			config.KillEventID = ""
+			SaveConfig(config)
+			go buildEventMenu()
+		})
+		actions.Add(noEventAction)
+
+		if len(events) > 0 {
+			actions.Add(walk.NewSeparatorAction())
+		}
+
+		// One entry per active event
+		for _, evt := range events {
+			e := evt // capture
+			action := walk.NewAction()
+			label := e.Name
+			if e.Prize != "" {
+				label += " — " + e.Prize
+			}
+			if GetSelectedEventID() == e.ID {
+				action.SetText("✓ " + label)
+			} else {
+				action.SetText("  " + label)
+			}
+			action.Triggered().Attach(func() {
+				SetSelectedEventID(e.ID)
+				config.KillEventID = e.ID
+				SaveConfig(config)
+				go buildEventMenu()
+			})
+			actions.Add(action)
+		}
+
+		// Refresh option
+		actions.Add(walk.NewSeparatorAction())
+		refreshAction := walk.NewAction()
+		refreshAction.SetText(T("event.refresh"))
+		refreshAction.Triggered().Attach(func() {
+			go func() {
+				RefreshEvents()
+				buildEventMenu()
+			}()
+		})
+		actions.Add(refreshAction)
 	})
 }
 

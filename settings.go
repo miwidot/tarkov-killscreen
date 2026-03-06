@@ -96,6 +96,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	var soundCB *walk.CheckBox
 	var overlayCB *walk.CheckBox
 	var overlayDurationNE *walk.NumberEdit
+	var eventCB *walk.ComboBox
 
 	newToken := currentToken
 	newEnabled := cfg.API.Enabled
@@ -115,6 +116,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	if newLang == "" {
 		newLang = "de"
 	}
+	newEventID := GetSelectedEventID()
 
 	// Find current hotkey index
 	hotkeyIndex := 0
@@ -144,6 +146,25 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	langLabels := make([]string, len(LanguageOptions))
 	for i, opt := range LanguageOptions {
 		langLabels[i] = LanguageLabels[opt]
+	}
+
+	// Build event dropdown: ["Kein Event", "Event1 — Prize", "Event2 — Prize", ...]
+	events := GetActiveEvents()
+	eventLabels := make([]string, 0, len(events)+1)
+	eventIDs := make([]string, 0, len(events)+1)
+	eventLabels = append(eventLabels, T("event.none"))
+	eventIDs = append(eventIDs, "")
+	eventIndex := 0
+	for _, e := range events {
+		label := e.Name
+		if e.Prize != "" {
+			label += " — " + e.Prize
+		}
+		eventLabels = append(eventLabels, label)
+		eventIDs = append(eventIDs, e.ID)
+		if e.ID == newEventID {
+			eventIndex = len(eventIDs) - 1
+		}
 	}
 
 	if err := (Dialog{
@@ -181,6 +202,19 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 			},
 			VSeparator{},
 			CheckBox{AssignTo: &autostartCB, Text: T("settings.autostart"), Checked: newAutostart},
+			VSeparator{},
+			Label{Text: T("settings.event")},
+			ComboBox{
+				AssignTo:     &eventCB,
+				Model:        eventLabels,
+				CurrentIndex: eventIndex,
+				OnCurrentIndexChanged: func() {
+					idx := eventCB.CurrentIndex()
+					if idx >= 0 && idx < len(eventIDs) {
+						newEventID = eventIDs[idx]
+					}
+				},
+			},
 			VSeparator{},
 			Label{Text: T("settings.feedback")},
 			Label{Text: T("settings.feedback.desc"), Font: Font{PointSize: 8}, TextColor: walk.RGB(130, 130, 130)},
@@ -249,6 +283,9 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 		cfg.API.Enabled = newEnabled
 		cfg.Hotkeys.CaptureKey = newHotkey
 		cfg.Language = newLang
+		SetSelectedEventID(newEventID)
+		cfg.KillEventID = newEventID
+		go buildEventMenu()
 		cfg.Autostart = newAutostart
 		cfg.Feedback.FlashEnabled = newFlash
 		cfg.Feedback.SoundEnabled = newSound

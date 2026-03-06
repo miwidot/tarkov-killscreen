@@ -47,6 +47,7 @@ type Config struct {
 	Language       string         `json:"language"`
 	Autostart      bool           `json:"autostart"`
 	EncryptedToken string         `json:"encrypted_token,omitempty"`
+	KillEventID    string         `json:"kill_event_id,omitempty"`
 }
 
 var defaultConfig = Config{
