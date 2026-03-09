@@ -347,6 +347,7 @@ func addToBatch(img *image.RGBA) {
 
 	// Compress to JPEG immediately — raw image can be GC'd after this
 	jpegData, err := compressImage(img, config)
+	img = nil
 	if err != nil {
 		fmt.Printf("[CAPTURE] Failed to compress: %v\n", err)
 		return
