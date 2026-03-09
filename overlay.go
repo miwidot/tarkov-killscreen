@@ -3,8 +3,7 @@
 // Displays a small notification popup (320x80) at the bottom-right
 // corner of the primary screen. Shows capture count and countdown timer.
 // Updates in-place when multiple screenshots are taken quickly.
-// Auto-closes after 3 seconds or on click.
-// Adapts to the Windows light/dark theme automatically.
+// Auto-closes after configurable duration (1-10s) or on click.
 package main
 
 import (
