@@ -157,25 +157,23 @@ func RunApp() {
 	// Check for updates on startup and every 30 minutes (after language is set)
 	go StartUpdateChecker()
 
-	// Restore saved event selection and validate against active events
-	if config.KillEventID != "" {
-		SetSelectedEventID(config.KillEventID)
-	}
+	// Restore saved event selection after loading active events from server
 	go func() {
 		RefreshEvents()
-		// Clear selection if saved event is no longer active
-		if id := GetSelectedEventID(); id != "" {
+		if config.KillEventID != "" {
+			// Only set if event is still active
 			events := GetActiveEvents()
 			found := false
 			for _, e := range events {
-				if e.ID == id {
+				if e.ID == config.KillEventID {
 					found = true
 					break
 				}
 			}
-			if !found {
+			if found {
+				SetSelectedEventID(config.KillEventID)
+			} else {
 				fmt.Println("[EVENTS] Saved event no longer active, clearing selection")
-				SetSelectedEventID("")
 				config.KillEventID = ""
 				SaveConfig(config)
 			}
@@ -303,8 +301,9 @@ func captureAndBatch() {
 		return
 	}
 
-	// Compress to JPEG immediately — raw image can be GC'd after this
+	// Compress to JPEG immediately — release raw image for GC
 	jpegData, compErr := compressImage(img, config)
+	img = nil
 	if compErr != nil {
 		fmt.Printf("[AUTO] Failed to compress: %v\n", compErr)
 		return

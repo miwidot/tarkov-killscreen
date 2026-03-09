@@ -15,7 +15,6 @@ import (
 	"unsafe"
 
 	"github.com/lxn/win"
-	"golang.org/x/sys/windows/registry"
 )
 
 var (
@@ -38,41 +37,10 @@ type overlayTheme struct {
 	textColorDim         win.COLORREF
 }
 
-var (
-	darkTheme = overlayTheme{
-		bgR: 30, bgG: 30, bgB: 30,
-		textColor:    win.COLORREF(0x00FFFFFF), // White
-		textColorDim: win.COLORREF(0x00AAAAAA), // Light gray
-	}
-	lightTheme = overlayTheme{
-		bgR: 243, bgG: 243, bgB: 243,
-		textColor:    win.COLORREF(0x001E1E1E), // Near-black
-		textColorDim: win.COLORREF(0x00666666), // Dark gray
-	}
-)
-
-// isWindowsDarkMode reads the Windows theme from the registry.
-func isWindowsDarkMode() bool {
-	key, err := registry.OpenKey(registry.CURRENT_USER,
-		`Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`,
-		registry.QUERY_VALUE)
-	if err != nil {
-		return true // Default to dark
-	}
-	defer key.Close()
-
-	val, _, err := key.GetIntegerValue("AppsUseLightTheme")
-	if err != nil {
-		return true
-	}
-	return val == 0 // 0 = dark, 1 = light
-}
-
-func getOverlayTheme() overlayTheme {
-	if isWindowsDarkMode() {
-		return darkTheme
-	}
-	return lightTheme
+var overlayThemeLight = overlayTheme{
+	bgR: 243, bgG: 243, bgB: 243,
+	textColor:    win.COLORREF(0x001E1E1E), // Near-black
+	textColorDim: win.COLORREF(0x00666666), // Dark gray
 }
 
 var (
@@ -184,14 +152,13 @@ func ShowOverlayMessage(line1, line2 string) {
 }
 
 func overlayWorker() {
-	// Detect theme at creation time
-	theme := getOverlayTheme()
+	theme := overlayThemeLight
 
 	overlayMutex.Lock()
 	overlayCurrentTheme = theme
 	overlayMutex.Unlock()
 
-	// Create background brush matching Windows theme
+	// Create background brush
 	colorRef := uintptr(uint32(theme.bgR) | uint32(theme.bgG)<<8 | uint32(theme.bgB)<<16)
 	hBrush, _, _ := procCreateSolidBrush.Call(colorRef)
 	overlayBrush = win.HBRUSH(hBrush)

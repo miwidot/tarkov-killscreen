@@ -473,7 +473,6 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 		if saveResp.Error != "" {
 			// Check for event-related errors
 			if IsEventError(saveResp.Error) {
-				go RefreshEvents()
 				return nil, fmt.Errorf("event error: %s", saveResp.Error)
 			}
 			return nil, fmt.Errorf("save error: %s", saveResp.Error)

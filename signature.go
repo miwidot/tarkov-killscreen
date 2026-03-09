@@ -20,11 +20,8 @@ var signatureMagic = []byte{0x54, 0x52, 0x4B, 0x56}
 // getSignaturePositions returns 8 pixel coordinates spread horizontally
 // near the bottom of an image, used for embedding/reading signature bytes.
 func getSignaturePositions(width, height int) []image.Point {
-	// X positions at different percentages across the width
 	xFactors := []float64{0.1, 0.3, 0.5, 0.7, 0.2, 0.4, 0.6, 0.8}
-	// Y position: 3 pixels from bottom
 	y := height - 3
-
 	positions := make([]image.Point, 8)
 	for i, factor := range xFactors {
 		x := int(float64(width) * factor)

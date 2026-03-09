@@ -204,16 +204,18 @@ func GetClipboardImage() (*image.RGBA, error) {
 	img := image.NewRGBA(image.Rect(0, 0, data.width, data.height))
 
 	if data.bitCount == 32 {
-		// 32-bit BGRA → RGBA: row-wise copy + byte swap
+		// 32-bit BGRA → RGBA: single-pass copy with BGR swap
 		for y := 0; y < data.height; y++ {
 			srcY := data.height - 1 - y // DIB is bottom-up
-			srcRow := data.rawData[srcY*data.rowSize : srcY*data.rowSize+data.width*4]
-			dstRow := img.Pix[y*img.Stride : y*img.Stride+data.width*4]
-			copy(dstRow, srcRow)
-			// Swap B↔R in-place (BGRA → RGBA)
-			for i := 0; i < len(dstRow); i += 4 {
-				dstRow[i], dstRow[i+2] = dstRow[i+2], dstRow[i]
-				dstRow[i+3] = 255 // Force full alpha
+			srcOffset := srcY * data.rowSize
+			dstOffset := y * img.Stride
+			for x := 0; x < data.width; x++ {
+				srcIdx := srcOffset + x*4
+				dstIdx := dstOffset + x*4
+				img.Pix[dstIdx] = data.rawData[srcIdx+2]   // B→R
+				img.Pix[dstIdx+1] = data.rawData[srcIdx+1] // G
+				img.Pix[dstIdx+2] = data.rawData[srcIdx]   // R→B
+				img.Pix[dstIdx+3] = 255                     // A
 			}
 		}
 	} else {
