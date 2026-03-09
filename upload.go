@@ -299,6 +299,7 @@ func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse
 		if _, err := part.Write(jpegData); err != nil {
 			return nil, err
 		}
+		jpegDatas[i] = nil // Free original bytes early
 	}
 
 	writer.Close()
