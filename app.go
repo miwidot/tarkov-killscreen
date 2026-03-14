@@ -30,8 +30,7 @@ var (
 	mainWindow *walk.MainWindow
 	notifyIcon *walk.NotifyIcon
 	config     *Config
-	watching   atomic.Bool
-	processing bool
+	watching atomic.Bool
 
 	// Auto-batching for multi-screenshot raids
 	batchImages    [][]byte      // Pre-compressed JPEG bytes
@@ -230,120 +229,6 @@ func RunApp() {
 
 // watchClipboardAuto polls the clipboard sequence number to detect new
 // screenshots. This is the legacy capture method, kept as fallback.
-func watchClipboardAuto() {
-	lastSeq := GetClipboardSequenceNumber()
-	debugLn("[AUTO] Watching clipboard... seq:", lastSeq)
-
-	ticker := 0
-	for watching.Load() {
-		time.Sleep(500 * time.Millisecond)
-		ticker++
-
-		// Heartbeat every 30 seconds
-		if ticker%60 == 0 {
-			debugLog("[AUTO] Heartbeat - still watching, seq: %d\n", lastSeq)
-		}
-
-		currentSeq := GetClipboardSequenceNumber()
-		if currentSeq != lastSeq {
-			lastSeq = currentSeq
-			debugLn("[AUTO] Clipboard changed, seq:", currentSeq)
-
-			time.Sleep(300 * time.Millisecond)
-
-			// Try to capture directly - more reliable than checking format first
-			go captureAndBatch()
-		}
-	}
-	debugLn("[AUTO] Watcher stopped!")
-}
-
-// captureAndBatch reads a screenshot from the clipboard, validates it, and
-// adds it to the current batch. Used by the clipboard watcher path.
-func captureAndBatch() {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("[AUTO] PANIC recovered: %v\n", r) // Always log panics
-		}
-	}()
-
-	// Check if Tarkov is running (outside of lock)
-	tarkovRunning := IsTarkovRunning()
-	debugLog("[AUTO] Tarkov running: %v\n", tarkovRunning)
-	if !tarkovRunning {
-		debugLn("[AUTO] Tarkov not running, ignoring screenshot")
-		return
-	}
-
-	// Get image from clipboard (outside of lock - clipboard has its own lock)
-	img, err := GetClipboardImage()
-	if err != nil || img == nil {
-		debugLn("[AUTO] No image in clipboard (text/other)")
-		return
-	}
-
-	debugLog("[AUTO] Got image %dx%d\n", img.Bounds().Dx(), img.Bounds().Dy())
-
-	width := img.Bounds().Dx()
-	height := img.Bounds().Dy()
-
-	// Check minimum size (server requires 800x400)
-	if width < 800 || height < 400 {
-		debugLog("[AUTO] Image too small (%dx%d), minimum 800x400, skipping...\n", width, height)
-		return
-	}
-
-	// Check for valid aspect ratios
-	aspectRatio := float64(width) / float64(height)
-	validRatio := isValidAspectRatio(aspectRatio)
-	if !validRatio {
-		debugLog("[AUTO] Invalid aspect ratio (%.2f), skipping...\n", aspectRatio)
-		showWarning(T("invalid.screenshot"), T("invalid.aspect"))
-		return
-	}
-
-	// Compress to JPEG immediately — release raw image for GC
-	jpegData, compErr := compressImage(img, config)
-	img = nil
-	if compErr != nil {
-		fmt.Printf("[AUTO] Failed to compress: %v\n", compErr)
-		return
-	}
-
-	// Now lock to add to batch or pending queue
-	batchMutex.Lock()
-
-	// Add to pending queue if uploading, otherwise add to batch
-	if batchUploading {
-		pendingImages = append(pendingImages, jpegData)
-		count := len(pendingImages)
-		debugLog("[PENDING] Image %d added to pending queue (upload in progress)\n", count)
-		showBalloon(T("screenshot.queued"), fmt.Sprintf(T("screenshot.queued.count"), count))
-		batchMutex.Unlock()
-		return
-	}
-
-	// Add compressed bytes to batch
-	batchImages = append(batchImages, jpegData)
-	count := len(batchImages)
-	debugLog("[BATCH] Image %d added to batch\n", count)
-
-	// Show notification
-	if count == 1 {
-		showBalloon(T("screenshot.captured"), T("screenshot.waiting"))
-	} else {
-		showBalloon(T("screenshot.captured"), fmt.Sprintf(T("screenshot.batch"), count))
-	}
-
-	// Reset timer
-	if batchTimer != nil {
-		batchTimer.Stop()
-	}
-	batchTimer = time.AfterFunc(batchWaitTime, processBatch)
-
-	batchMutex.Unlock()
-}
-
 // processBatch uploads all batched screenshots to the OCR API, saves any
 // detected kills, and shows the result notification. Called after the 20s
 // batch timer expires.

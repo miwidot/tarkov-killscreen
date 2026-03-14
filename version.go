@@ -207,22 +207,24 @@ func showUpdateDialog(release GithubRelease) {
 
 // showUpdateTray adds an update entry to the tray menu and blinks the icon.
 func showUpdateTray(release GithubRelease) {
-	if notifyIcon == nil {
+	if notifyIcon == nil || mainWindow == nil {
 		return
 	}
 
-	// Add update menu entry if not already present
-	if updateAction == nil {
-		updateAction = walk.NewAction()
-		updateAction.Triggered().Attach(func() {
-			openBrowser(latestRelease.HTMLURL)
-		})
-		// Insert at top of menu
-		notifyIcon.ContextMenu().Actions().Insert(0, updateAction)
-		sep := walk.NewSeparatorAction()
-		notifyIcon.ContextMenu().Actions().Insert(1, sep)
-	}
-	updateAction.SetText(fmt.Sprintf(T("update.available"), release.TagName))
+	mainWindow.Synchronize(func() {
+		// Add update menu entry if not already present
+		if updateAction == nil {
+			updateAction = walk.NewAction()
+			updateAction.Triggered().Attach(func() {
+				openBrowser(latestRelease.HTMLURL)
+			})
+			// Insert at top of menu
+			notifyIcon.ContextMenu().Actions().Insert(0, updateAction)
+			sep := walk.NewSeparatorAction()
+			notifyIcon.ContextMenu().Actions().Insert(1, sep)
+		}
+		updateAction.SetText(fmt.Sprintf(T("update.available"), release.TagName))
+	})
 
 	// Show balloon notification
 	showBalloon(T("update.title"), fmt.Sprintf(T("update.available"), release.TagName))
@@ -248,20 +250,24 @@ func startIconBlink() {
 		for {
 			select {
 			case <-blinkStop:
-				if notifyIcon != nil && normalIcon != nil {
-					notifyIcon.SetIcon(normalIcon)
+				if notifyIcon != nil && mainWindow != nil && normalIcon != nil {
+					mainWindow.Synchronize(func() {
+						notifyIcon.SetIcon(normalIcon)
+					})
 				}
 				return
 			case <-ticker.C:
-				if notifyIcon == nil {
+				if notifyIcon == nil || mainWindow == nil {
 					return
 				}
 				show = !show
-				if show && updateIcon != nil {
-					notifyIcon.SetIcon(updateIcon)
-				} else if normalIcon != nil {
-					notifyIcon.SetIcon(normalIcon)
-				}
+				mainWindow.Synchronize(func() {
+					if show && updateIcon != nil {
+						notifyIcon.SetIcon(updateIcon)
+					} else if normalIcon != nil {
+						notifyIcon.SetIcon(normalIcon)
+					}
+				})
 			}
 		}
 	}()

@@ -39,7 +39,6 @@ var (
 	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
 	procIsWindowVisible          = user32.NewProc("IsWindowVisible")
 	procIsIconic                 = user32.NewProc("IsIconic")
-	procGetWindowRect            = user32.NewProc("GetWindowRect")
 	procMonitorFromWindow        = user32.NewProc("MonitorFromWindow")
 	procGetMonitorInfoW          = user32.NewProc("GetMonitorInfoW")
 	procOpenProcessToken         = advapi32.NewProc("OpenProcessToken")
