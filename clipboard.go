@@ -154,6 +154,12 @@ func copyClipboardData() *clipboardData {
 	rowSize := ((width*bitCount + 31) / 32) * 4
 	dataSize := rowSize * height
 
+	// Validate that data fits within the memory block
+	if uintptr(headerSize)+uintptr(dataSize) > size {
+		debugLn("[CLIPBOARD] DIB data exceeds memory block")
+		return nil
+	}
+
 	// Quick copy of raw bytes using native memcpy
 	rawData := make([]byte, dataSize)
 	dataPtr := ptr + uintptr(headerSize)

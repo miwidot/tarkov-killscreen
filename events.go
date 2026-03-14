@@ -54,7 +54,7 @@ func FetchActiveEvents() ([]KillEvent, error) {
 		return nil, fmt.Errorf("events API returned %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read events response: %v", err)
 	}

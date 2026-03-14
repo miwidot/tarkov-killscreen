@@ -44,7 +44,7 @@ func LoadOrCreateDeviceID() string {
 		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 
 	os.MkdirAll(getConfigDir(), 0755)
-	if err := os.WriteFile(path, []byte(id), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(id), 0600); err != nil {
 		fmt.Printf("[DEVICE] Failed to save device ID: %v\n", err)
 	}
 

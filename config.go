@@ -184,5 +184,5 @@ func SaveConfig(cfg *Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(getConfigPath(), data, 0644)
+	return os.WriteFile(getConfigPath(), data, 0600)
 }

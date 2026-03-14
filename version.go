@@ -14,9 +14,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"strings"
+	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/lxn/walk"
 )
@@ -266,7 +267,11 @@ func startIconBlink() {
 	}()
 }
 
-// openBrowser opens the default browser with the given URL
+// openBrowser opens the default browser with the given URL using ShellExecuteW
+// (no shell parsing, immune to command injection via crafted URLs)
 func openBrowser(url string) {
-	exec.Command("cmd", "/c", "start", url).Start()
+	verb, _ := syscall.UTF16PtrFromString("open")
+	urlPtr, _ := syscall.UTF16PtrFromString(url)
+	procShellExecuteW.Call(0, uintptr(unsafe.Pointer(verb)),
+		uintptr(unsafe.Pointer(urlPtr)), 0, 0, 1)
 }
