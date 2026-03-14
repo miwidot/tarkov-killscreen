@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -485,6 +486,9 @@ func processBatch() {
 	}
 
 	updateStatsAction()
+
+	// Release memory back to OS after batch processing peak
+	debug.FreeOSMemory()
 }
 
 // buildTrayMenu populates the system tray context menu with status info,
