@@ -6,6 +6,7 @@
 package main
 
 import (
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -59,6 +60,8 @@ func ShowFlash() {
 }
 
 func flashWorker() {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	defer atomic.StoreInt32(&flashActive, 0)
 
 	className, _ := syscall.UTF16PtrFromString("TarkovFlash")

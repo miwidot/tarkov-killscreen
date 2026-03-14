@@ -8,6 +8,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -151,6 +152,9 @@ func ShowOverlayMessage(line1, line2 string) {
 }
 
 func overlayWorker() {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	theme := overlayThemeLight
 
 	overlayMutex.Lock()

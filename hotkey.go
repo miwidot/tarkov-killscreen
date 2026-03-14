@@ -368,8 +368,8 @@ func addToBatch(img *image.RGBA) {
 		pendingImages = append(pendingImages, jpegData)
 		count := len(pendingImages)
 		debugLog("[PENDING] Image %d added to pending queue\n", count)
-		triggerCaptureFeedback(count)
 		batchMutex.Unlock()
+		triggerCaptureFeedback(count)
 		return
 	}
 
@@ -385,8 +385,6 @@ func addToBatch(img *image.RGBA) {
 	count := len(batchImages)
 	fmt.Printf("[BATCH] Screenshot %d/%d added, waiting 20s...\n", count, maxBatchSize)
 
-	triggerCaptureFeedback(count)
-
 	// At max: start upload immediately instead of waiting
 	if count >= maxBatchSize {
 		fmt.Println("[BATCH] Max reached, processing immediately...")
@@ -395,6 +393,7 @@ func addToBatch(img *image.RGBA) {
 		}
 		batchTimer = time.AfterFunc(1*time.Second, processBatch)
 		batchMutex.Unlock()
+		triggerCaptureFeedback(count)
 		return
 	}
 
@@ -405,6 +404,7 @@ func addToBatch(img *image.RGBA) {
 	batchTimer = time.AfterFunc(batchWaitTime, processBatch)
 
 	batchMutex.Unlock()
+	triggerCaptureFeedback(count)
 }
 
 // triggerCaptureFeedback fires the configured feedback mechanisms (flash,
