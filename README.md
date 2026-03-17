@@ -262,6 +262,10 @@ All APIs used are standard, documented Windows APIs. No undocumented or game-spe
 
 ---
 
+## Author
+
+**Martin Wilke** — Malaysia
+
 ## License
 
 MIT License — See [LICENSE](LICENSE) for details.
