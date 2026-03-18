@@ -117,6 +117,13 @@ var translations = map[string]map[string]string{
 
 		// Hotkey Labels
 		"hotkey.PrintScreen":     "Druck",
+		"hotkey.F2":              "F2",
+		"hotkey.F3":              "F3",
+		"hotkey.F4":              "F4",
+		"hotkey.F5":              "F5",
+		"hotkey.F6":              "F6",
+		"hotkey.F7":              "F7",
+		"hotkey.F8":              "F8",
 		"hotkey.F9":              "F9",
 		"hotkey.F10":             "F10",
 		"hotkey.F11":             "F11",
@@ -244,6 +251,13 @@ var translations = map[string]map[string]string{
 
 		// Hotkey Labels
 		"hotkey.PrintScreen":     "Print Screen",
+		"hotkey.F2":              "F2",
+		"hotkey.F3":              "F3",
+		"hotkey.F4":              "F4",
+		"hotkey.F5":              "F5",
+		"hotkey.F6":              "F6",
+		"hotkey.F7":              "F7",
+		"hotkey.F8":              "F8",
 		"hotkey.F9":              "F9",
 		"hotkey.F10":             "F10",
 		"hotkey.F11":             "F11",

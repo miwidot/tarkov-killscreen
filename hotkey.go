@@ -121,6 +121,13 @@ func unregisterGlobalHotkey() {
 // Virtual key codes
 const (
 	VK_SNAPSHOT      = 0x2C // Print Screen
+	VK_F2            = 0x71 // F2
+	VK_F3            = 0x72 // F3
+	VK_F4            = 0x73 // F4
+	VK_F5            = 0x74 // F5
+	VK_F6            = 0x75 // F6
+	VK_F7            = 0x76 // F7
+	VK_F8            = 0x77 // F8
 	VK_F9            = 0x78 // F9
 	VK_F10           = 0x79 // F10
 	VK_F11           = 0x7A // F11
@@ -152,6 +159,13 @@ const (
 // HotkeyOptions defines available hotkey choices for the dropdown
 var HotkeyOptions = []string{
 	"PrintScreen",
+	"F2",
+	"F3",
+	"F4",
+	"F5",
+	"F6",
+	"F7",
+	"F8",
 	"F9",
 	"F10",
 	"F11",
@@ -188,6 +202,13 @@ func GetHotkeyLabel(name string) string {
 // hotkeyToVK maps key names to virtual key codes
 var hotkeyToVK = map[string]uintptr{
 	"PrintScreen":     VK_SNAPSHOT,
+	"F2":              VK_F2,
+	"F3":              VK_F3,
+	"F4":              VK_F4,
+	"F5":              VK_F5,
+	"F6":              VK_F6,
+	"F7":              VK_F7,
+	"F8":              VK_F8,
 	"F9":              VK_F9,
 	"F10":             VK_F10,
 	"F11":             VK_F11,
