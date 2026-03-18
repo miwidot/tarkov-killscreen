@@ -120,27 +120,64 @@ func unregisterGlobalHotkey() {
 
 // Virtual key codes
 const (
-	VK_SNAPSHOT   = 0x2C // Print Screen
-	VK_F11        = 0x7A // F11
-	VK_F12        = 0x7B // F12
-	VK_SCROLL     = 0x91 // Scroll Lock
-	VK_PAUSE      = 0x13 // Pause/Break
-	VK_PRIOR      = 0x21 // Page Up
-	VK_NEXT       = 0x22 // Page Down
-	VK_INSERT     = 0x2D // Insert
-	VK_DELETE     = 0x2E // Delete
+	VK_SNAPSHOT      = 0x2C // Print Screen
+	VK_F9            = 0x78 // F9
+	VK_F10           = 0x79 // F10
+	VK_F11           = 0x7A // F11
+	VK_F12           = 0x7B // F12
+	VK_SCROLL        = 0x91 // Scroll Lock
+	VK_PAUSE         = 0x13 // Pause/Break
+	VK_PRIOR         = 0x21 // Page Up
+	VK_NEXT          = 0x22 // Page Down
+	VK_HOME          = 0x24 // Home
+	VK_END           = 0x23 // End
+	VK_INSERT        = 0x2D // Insert
+	VK_DELETE        = 0x2E // Delete
+	VK_NUMPAD0       = 0x60 // Numpad 0
+	VK_NUMPAD1       = 0x61 // Numpad 1
+	VK_NUMPAD2       = 0x62 // Numpad 2
+	VK_NUMPAD3       = 0x63 // Numpad 3
+	VK_NUMPAD4       = 0x64 // Numpad 4
+	VK_NUMPAD5       = 0x65 // Numpad 5
+	VK_NUMPAD6       = 0x66 // Numpad 6
+	VK_NUMPAD7       = 0x67 // Numpad 7
+	VK_NUMPAD8       = 0x68 // Numpad 8
+	VK_NUMPAD9       = 0x69 // Numpad 9
+	VK_MULTIPLY      = 0x6A // Numpad *
+	VK_ADD           = 0x6B // Numpad +
+	VK_SUBTRACT      = 0x6D // Numpad -
+	VK_DIVIDE        = 0x6F // Numpad /
 )
 
 // HotkeyOptions defines available hotkey choices for the dropdown
 var HotkeyOptions = []string{
 	"PrintScreen",
+	"F9",
+	"F10",
+	"F11",
 	"F12",
 	"ScrollLock",
 	"Pause",
 	"PageUp",
 	"PageDown",
+	"Home",
+	"End",
 	"Insert",
 	"Delete",
+	"Numpad0",
+	"Numpad1",
+	"Numpad2",
+	"Numpad3",
+	"Numpad4",
+	"Numpad5",
+	"Numpad6",
+	"Numpad7",
+	"Numpad8",
+	"Numpad9",
+	"NumpadMultiply",
+	"NumpadAdd",
+	"NumpadSubtract",
+	"NumpadDivide",
 }
 
 // GetHotkeyLabel returns the localized display label for a hotkey name.
@@ -150,15 +187,33 @@ func GetHotkeyLabel(name string) string {
 
 // hotkeyToVK maps key names to virtual key codes
 var hotkeyToVK = map[string]uintptr{
-	"PrintScreen": VK_SNAPSHOT,
-	"F12":         VK_F12,
-	"F11":         VK_F11,
-	"ScrollLock":  VK_SCROLL,
-	"Pause":       VK_PAUSE,
-	"PageUp":      VK_PRIOR,
-	"PageDown":    VK_NEXT,
-	"Insert":      VK_INSERT,
-	"Delete":      VK_DELETE,
+	"PrintScreen":     VK_SNAPSHOT,
+	"F9":              VK_F9,
+	"F10":             VK_F10,
+	"F11":             VK_F11,
+	"F12":             VK_F12,
+	"ScrollLock":      VK_SCROLL,
+	"Pause":           VK_PAUSE,
+	"PageUp":          VK_PRIOR,
+	"PageDown":        VK_NEXT,
+	"Home":            VK_HOME,
+	"End":             VK_END,
+	"Insert":          VK_INSERT,
+	"Delete":          VK_DELETE,
+	"Numpad0":         VK_NUMPAD0,
+	"Numpad1":         VK_NUMPAD1,
+	"Numpad2":         VK_NUMPAD2,
+	"Numpad3":         VK_NUMPAD3,
+	"Numpad4":         VK_NUMPAD4,
+	"Numpad5":         VK_NUMPAD5,
+	"Numpad6":         VK_NUMPAD6,
+	"Numpad7":         VK_NUMPAD7,
+	"Numpad8":         VK_NUMPAD8,
+	"Numpad9":         VK_NUMPAD9,
+	"NumpadMultiply":  VK_MULTIPLY,
+	"NumpadAdd":       VK_ADD,
+	"NumpadSubtract":  VK_SUBTRACT,
+	"NumpadDivide":    VK_DIVIDE,
 }
 
 // snippingToolRegistryKey is the registry path for the PrintScreen → Snipping Tool setting.
