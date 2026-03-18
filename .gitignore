@@ -36,5 +36,11 @@ a1/
 tmp/
 temp/
 
+# Code signing certificates
+*.pfx
+*.p12
+*.key
+*.pem
+
 # Go build cache
 vendor/
