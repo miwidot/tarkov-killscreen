@@ -154,6 +154,9 @@ func RunApp() {
 	// Load or generate device ID for token binding
 	LoadOrCreateDeviceID()
 
+	// Update autostart path if exe was moved
+	RefreshAutostart()
+
 	// Check for updates on startup and every 30 minutes (after language is set)
 	go StartUpdateChecker()
 

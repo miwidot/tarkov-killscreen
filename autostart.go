@@ -6,6 +6,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -47,4 +48,35 @@ func GetAutostart() bool {
 
 	_, _, err = key.GetStringValue(autostartValueName)
 	return err == nil
+}
+
+// RefreshAutostart updates the autostart registry path to the current exe location.
+// Should be called on every app start to handle exe moves/updates.
+func RefreshAutostart() {
+	if !GetAutostart() {
+		return
+	}
+
+	key, err := registry.OpenKey(registry.CURRENT_USER, autostartRegistryKey, registry.QUERY_VALUE)
+	if err != nil {
+		return
+	}
+
+	val, _, err := key.GetStringValue(autostartValueName)
+	key.Close()
+	if err != nil {
+		return
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+
+	// Compare stored path with current exe path (strip quotes)
+	storedPath := strings.Trim(val, `"`)
+	if !strings.EqualFold(storedPath, exe) {
+		debugLog("[AUTOSTART] Path changed: %s → %s\n", storedPath, exe)
+		SetAutostart(true)
+	}
 }
