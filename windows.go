@@ -327,6 +327,36 @@ var imageViewerProcesses = []string{
 	"paintshoppro.exe",
 	"pspx.exe",
 	"captureone.exe",
+
+	// Game recording/overlay tools (overlays corrupt OCR)
+	// NOTE: OBS intentionally excluded — users stream with it
+	"medal.exe",
+	"medalencoder.exe",
+	"outplayed.exe",
+	"overwolf.exe",
+	"overwolfbrowser.exe",
+	"insightscapture.exe",
+	"capture.exe",
+	"insights capture.exe",
+	"plays.exe",
+	"playstv.exe",
+	"action.exe",        // Mirillis Action
+	"bandicam.exe",
+	"bdcam.exe",
+	"fraps.exe",
+	"xsplit.exe",
+	"xsplitbroadcaster.exe",
+	"xsplitgamecaster.exe",
+	"gamebar.exe",       // Xbox Game Bar
+	"gamebarpresencewriter.exe",
+	"d3dgear.exe",       // D3DGear
+	"litecam.exe",
+	"raptr.exe",         // AMD Raptr/Gaming Evolved
+	"plays_ep64.exe",
+	"relive.exe",        // AMD ReLive
+	"nvspcaps64.exe",    // NVIDIA ShadowPlay Capture Server
+	"nvshare.exe",       // NVIDIA Share overlay (Alt+Z)
+	"nvidia share.exe",  // NVIDIA Share overlay
 	"darktable.exe",
 	"rawtherapee.exe",
 
