@@ -297,7 +297,6 @@ func SetHotkey(keyName string) {
 // WatchHotkey polls for configured hotkey press
 func WatchHotkey() {
 	keyName := GetHotkeyName(currentHotkey)
-	registerGlobalHotkey(currentHotkey)
 	fmt.Printf("[READY] Press %s to capture screenshots\n", keyName)
 
 	var lastState int16 = 0

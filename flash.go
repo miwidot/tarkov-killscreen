@@ -10,7 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/lxn/win"
@@ -18,6 +17,7 @@ import (
 
 var (
 	procSetLayeredWindowAttributes = user32.NewProc("SetLayeredWindowAttributes")
+	procSetTimer                   = user32.NewProc("SetTimer")
 )
 
 const (
@@ -95,11 +95,8 @@ func flashWorker() {
 	win.ShowWindow(hwnd, win.SW_SHOWNOACTIVATE)
 	win.UpdateWindow(hwnd)
 
-	// Auto-close after 150ms
-	go func() {
-		time.Sleep(150 * time.Millisecond)
-		win.PostMessage(hwnd, win.WM_CLOSE, 0, 0)
-	}()
+	// Auto-close after 150ms via Windows timer (runs on same thread as message loop)
+	procSetTimer.Call(uintptr(hwnd), 1, 150, 0)
 
 	// Message loop
 	var msg win.MSG
@@ -115,6 +112,9 @@ func flashWorker() {
 
 func flashWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
+	case win.WM_TIMER:
+		win.DestroyWindow(hwnd)
+		return 0
 	case win.WM_CLOSE:
 		win.DestroyWindow(hwnd)
 		return 0
