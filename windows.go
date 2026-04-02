@@ -35,6 +35,7 @@ var (
 	procProcess32NextW           = kernel32.NewProc("Process32NextW")
 	procCloseHandle              = kernel32.NewProc("CloseHandle")
 	procCreateMutexW             = kernel32.NewProc("CreateMutexW")
+	procOpenProcess              = kernel32.NewProc("OpenProcess")
 	procEnumWindows              = user32.NewProc("EnumWindows")
 	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
 	procIsWindowVisible          = user32.NewProc("IsWindowVisible")
@@ -444,6 +445,67 @@ func IsImageViewerRunning() (bool, string) {
 	}
 
 	return false, ""
+}
+
+// IsTarkovElevated checks if any running Tarkov process is elevated.
+// Returns true if Tarkov is running with admin privileges.
+func IsTarkovElevated() bool {
+	snapshot, _, _ := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
+	if snapshot == 0 || snapshot == ^uintptr(0) {
+		return false
+	}
+	defer procCloseHandle.Call(snapshot)
+
+	var entry PROCESSENTRY32W
+	entry.Size = uint32(unsafe.Sizeof(entry))
+
+	ret, _, _ := procProcess32FirstW.Call(snapshot, uintptr(unsafe.Pointer(&entry)))
+	if ret == 0 {
+		return false
+	}
+
+	for {
+		exeName := strings.ToLower(syscall.UTF16ToString(entry.ExeFile[:]))
+		if exeName == "escapefromtarkov.exe" {
+			if isProcessElevated(entry.ProcessID) {
+				return true
+			}
+		}
+		ret, _, _ = procProcess32NextW.Call(snapshot, uintptr(unsafe.Pointer(&entry)))
+		if ret == 0 {
+			break
+		}
+	}
+	return false
+}
+
+// isProcessElevated checks if a specific process is running elevated.
+func isProcessElevated(pid uint32) bool {
+	const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+	handle, _, _ := procOpenProcess.Call(PROCESS_QUERY_LIMITED_INFORMATION, 0, uintptr(pid))
+	if handle == 0 {
+		return false
+	}
+	defer procCloseHandle.Call(handle)
+
+	var token syscall.Token
+	ret, _, _ := procOpenProcessToken.Call(handle, syscall.TOKEN_QUERY, uintptr(unsafe.Pointer(&token)))
+	if ret == 0 {
+		return false
+	}
+	defer token.Close()
+
+	var elevation uint32
+	var returnLen uint32
+	ret, _, _ = procGetTokenInformation.Call(
+		uintptr(token), 20, // TokenElevation
+		uintptr(unsafe.Pointer(&elevation)), 4,
+		uintptr(unsafe.Pointer(&returnLen)),
+	)
+	if ret == 0 {
+		return false
+	}
+	return elevation != 0
 }
 
 // isElevated checks if the current process is running with admin (elevated) privileges.

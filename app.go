@@ -222,9 +222,12 @@ func RunApp() {
 	hotkeyName := GetHotkeyName(currentHotkey)
 	showBalloon("Tarkov Screenshoter "+CurrentVersion, fmt.Sprintf(T("ready.capture"), hotkeyName))
 
-	// Warn if Tarkov is running elevated but we are not
-	if !isElevated() && IsTarkovRunning() {
-		showWarning("Tarkov Screenshoter", T("admin.hint"))
+	// Auto-restart as admin if Tarkov is running elevated
+	if !isElevated() && IsTarkovRunning() && IsTarkovElevated() {
+		fmt.Println("[APP] Tarkov is running as admin, restarting elevated...")
+		if err := restartAsAdmin(); err != nil {
+			showWarning("Tarkov Screenshoter", T("admin.hint"))
+		}
 	}
 
 	mainWindow.Run()
