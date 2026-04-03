@@ -331,11 +331,7 @@ var imageViewerProcesses = []string{
 
 	// Game recording/overlay tools (overlays corrupt OCR)
 	// NOTE: OBS intentionally excluded — users stream with it
-	"medal.exe",
-	"medalencoder.exe",
 	"outplayed.exe",
-	"overwolf.exe",
-	"overwolfbrowser.exe",
 	"insightscapture.exe",
 	"capture.exe",
 	"insights capture.exe",
