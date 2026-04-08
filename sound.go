@@ -31,3 +31,23 @@ func PlayCaptureSound() {
 		)
 	}()
 }
+
+const (
+	sndFilename = 0x00020000
+)
+
+// PlayKillSound plays the user-configured WAV file for kill notifications.
+// Non-blocking. Does nothing if path is empty or file doesn't exist.
+func PlayKillSound(wavPath string) {
+	if wavPath == "" {
+		return
+	}
+	go func() {
+		path, _ := syscall.UTF16PtrFromString(wavPath)
+		procPlaySound.Call(
+			uintptr(unsafe.Pointer(path)),
+			0,
+			sndFilename|sndAsync|sndNoDefault,
+		)
+	}()
+}

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.5 (2026-04-08)
+
+### ✨ Neue Features
+
+- **Kill-Sound** — Eigene WAV-Datei abspielen wenn Kills erkannt werden
+  - Einstellbar in den Settings (Durchsuchen / Löschen / Vorschau ▶)
+  - Non-blocking, stört die Aufnahme nicht
+
+### 🔒 Code Signing
+
+- **EXE ist jetzt digital signiert** (Certum Open Source Developer Certificate)
+- Windows SmartScreen zeigt "Open Source Developer Martin Wilke" statt "Unbekannter Herausgeber"
+- Weniger Fehlalarme von Windows Defender und Antivirus-Software
+
+---
+
 ## Alpha 5 (2026-01-29)
 
 ### 🔥 Breaking Change: Clipboard Monitoring → Direct Hotkey Capture

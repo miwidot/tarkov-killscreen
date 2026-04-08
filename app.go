@@ -327,6 +327,10 @@ func processBatch() {
 
 		if resp.Data.TotalKills > 0 {
 			totalKills.Add(int64(resp.Data.TotalKills))
+			// Play kill sound if configured
+			if config.Feedback.KillSoundPath != "" {
+				PlayKillSound(config.Feedback.KillSoundPath)
+			}
 			// Save kills even if some images were invalid - server filters invalid ones
 			saveResp, err := SaveKills(resp, config)
 			if err != nil && IsEventError(err.Error()) {

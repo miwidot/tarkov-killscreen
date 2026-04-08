@@ -96,6 +96,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	var soundCB *walk.CheckBox
 	var overlayCB *walk.CheckBox
 	var overlayDurationNE *walk.NumberEdit
+	var killSoundLE *walk.LineEdit
 	var eventCB *walk.ComboBox
 
 	newToken := currentToken
@@ -108,6 +109,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 	if newOverlayDuration == 0 {
 		newOverlayDuration = 3
 	}
+	newKillSoundPath := cfg.Feedback.KillSoundPath
 	newHotkey := cfg.Hotkeys.CaptureKey
 	if newHotkey == "" {
 		newHotkey = "PrintScreen"
@@ -237,6 +239,45 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 					HSpacer{},
 				},
 			},
+			VSeparator{},
+			Label{Text: T("settings.killsound")},
+			Label{Text: T("settings.killsound.desc"), Font: Font{PointSize: 8}, TextColor: walk.RGB(130, 130, 130)},
+			Composite{
+				Layout: HBox{MarginsZero: true},
+				Children: []Widget{
+					LineEdit{AssignTo: &killSoundLE, Text: newKillSoundPath, ReadOnly: true},
+					PushButton{
+						Text:    T("settings.killsound.browse"),
+						MaxSize: Size{Width: 100},
+						OnClicked: func() {
+							dlgFile := new(walk.FileDialog)
+							dlgFile.Filter = "WAV Files (*.wav)|*.wav"
+							dlgFile.Title = T("settings.killsound.browse")
+							if accepted, _ := dlgFile.ShowOpen(dlg); accepted {
+								newKillSoundPath = dlgFile.FilePath
+								killSoundLE.SetText(newKillSoundPath)
+							}
+						},
+					},
+					PushButton{
+						Text:    T("settings.killsound.clear"),
+						MaxSize: Size{Width: 60},
+						OnClicked: func() {
+							newKillSoundPath = ""
+							killSoundLE.SetText("")
+						},
+					},
+					PushButton{
+						Text:    "▶",
+						MaxSize: Size{Width: 30},
+						OnClicked: func() {
+							if newKillSoundPath != "" {
+								PlayKillSound(newKillSoundPath)
+							}
+						},
+					},
+				},
+			},
 			VSpacer{},
 			Composite{
 				Layout: HBox{},
@@ -291,6 +332,7 @@ func ShowSettingsDialog(owner walk.Form, cfg *Config) (saved bool, err error) {
 		cfg.Feedback.SoundEnabled = newSound
 		cfg.Feedback.OverlayEnabled = newOverlay
 		cfg.Feedback.OverlayDuration = newOverlayDuration
+		cfg.Feedback.KillSoundPath = newKillSoundPath
 		SaveConfig(cfg)
 
 		// Apply hotkey change immediately

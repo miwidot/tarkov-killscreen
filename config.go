@@ -33,10 +33,11 @@ type APIConfig struct {
 
 // FeedbackConfig controls capture feedback mechanisms.
 type FeedbackConfig struct {
-	FlashEnabled   bool `json:"flash_enabled"`
-	SoundEnabled   bool `json:"sound_enabled"`
-	OverlayEnabled bool `json:"overlay_enabled"`
-	OverlayDuration int  `json:"overlay_duration"`
+	FlashEnabled   bool   `json:"flash_enabled"`
+	SoundEnabled   bool   `json:"sound_enabled"`
+	OverlayEnabled bool   `json:"overlay_enabled"`
+	OverlayDuration int   `json:"overlay_duration"`
+	KillSoundPath  string `json:"kill_sound_path,omitempty"`
 }
 
 // Config is the top-level application configuration, serialized as config.json.
