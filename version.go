@@ -14,6 +14,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"syscall"
 	"time"
@@ -23,7 +24,7 @@ import (
 )
 
 const (
-	CurrentVersion = "1.0.5"
+	CurrentVersion = "1.0.6"
 	GithubRepo     = "miwidot/tarkov-killscreen"
 )
 
@@ -201,7 +202,17 @@ func showUpdateDialog(release GithubRelease) {
 	)
 
 	if result == walk.DlgCmdYes {
-		openBrowser(release.HTMLURL)
+		fmt.Println("[UPDATE] User accepted update, starting self-update...")
+		if err := PerformSelfUpdate(release); err != nil {
+			fmt.Println("[UPDATE] Self-update failed:", err)
+			// Fallback: open browser
+			walk.MsgBox(nil, T("update.title"),
+				T("update.failed")+"\n\n"+err.Error(),
+				walk.MsgBoxIconError)
+			openBrowser(release.HTMLURL)
+			return
+		}
+		os.Exit(0)
 	}
 }
 
@@ -216,7 +227,16 @@ func showUpdateTray(release GithubRelease) {
 		if updateAction == nil {
 			updateAction = walk.NewAction()
 			updateAction.Triggered().Attach(func() {
-				openBrowser(latestRelease.HTMLURL)
+				fmt.Println("[UPDATE] User clicked tray update, starting self-update...")
+				if err := PerformSelfUpdate(latestRelease); err != nil {
+					fmt.Println("[UPDATE] Self-update failed:", err)
+					walk.MsgBox(nil, T("update.title"),
+						T("update.failed")+"\n\n"+err.Error(),
+						walk.MsgBoxIconError)
+					openBrowser(latestRelease.HTMLURL)
+					return
+				}
+				os.Exit(0)
 			})
 			// Insert at top of menu
 			notifyIcon.ContextMenu().Actions().Insert(0, updateAction)

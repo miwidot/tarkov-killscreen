@@ -116,8 +116,9 @@ var translations = map[string]map[string]string{
 
 		// Update
 		"update.title":     "Update verfügbar",
-		"update.message":   "Eine neue Version ist verfügbar!\n\nAktuelle Version: %s\nNeue Version: %s\n\nJetzt herunterladen?",
-		"update.available": "⬆ Update: %s — Klicken zum Download",
+		"update.message":   "Eine neue Version ist verfügbar!\n\nAktuelle Version: %s\nNeue Version: %s\n\nJetzt automatisch updaten?",
+		"update.available": "Update: %s — Klicken zum Updaten",
+		"update.failed":    "Automatisches Update fehlgeschlagen.\nBrowser wird geöffnet zum manuellen Download.",
 
 		// Hotkey Labels
 		"hotkey.PrintScreen":     "Druck",
@@ -254,8 +255,9 @@ var translations = map[string]map[string]string{
 
 		// Update
 		"update.title":     "Update available",
-		"update.message":   "A new version is available!\n\nCurrent version: %s\nNew version: %s\n\nDownload now?",
-		"update.available": "⬆ Update: %s — Click to download",
+		"update.message":   "A new version is available!\n\nCurrent version: %s\nNew version: %s\n\nUpdate automatically?",
+		"update.available": "Update: %s — Click to update",
+		"update.failed":    "Automatic update failed.\nOpening browser for manual download.",
 
 		// Hotkey Labels
 		"hotkey.PrintScreen":     "Print Screen",

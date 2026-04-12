@@ -19,6 +19,17 @@ import (
 )
 
 func main() {
+	// Clean up old exe from previous self-update
+	CleanupOldExe()
+
+	// Check for --selfupdate-test flag
+	for _, arg := range os.Args[1:] {
+		if len(arg) > len("--selfupdate-test=") && arg[:len("--selfupdate-test=")] == "--selfupdate-test=" {
+			selfUpdateTestPath = arg[len("--selfupdate-test="):]
+			fmt.Println("[UPDATE] Test mode: update source =", selfUpdateTestPath)
+		}
+	}
+
 	// Prevent multiple instances
 	if IsAlreadyRunning() {
 		walk.MsgBox(nil, T("already.running.title"),

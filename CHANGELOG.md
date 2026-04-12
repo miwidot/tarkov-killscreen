@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.6 (2026-04-12)
+
+### Automatisches Self-Update / Automatic Self-Update
+- App kann sich jetzt selbst updaten ohne manuellen Download
+- Bei neuem Update: Dialog -> "Ja" -> EXE wird automatisch heruntergeladen, ersetzt und App startet neu
+- Fallback auf Browser-Download falls das automatische Update fehlschlaegt
+- Heruntergeladene EXE wird vor dem Ersetzen auf Gueltigkeit geprueft (MZ-Header, Dateigroesse)
+
+- App can now update itself without manual download
+- On new update: dialog -> "Yes" -> EXE is downloaded automatically, replaced, and app restarts
+- Falls back to browser download if automatic update fails
+- Downloaded EXE is verified before replacing (MZ header, file size)
+
+---
+
 ## 1.0.5 (2026-04-08)
 
 ### ✨ Neue Features
