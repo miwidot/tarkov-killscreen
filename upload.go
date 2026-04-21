@@ -25,10 +25,21 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"strings"
 	"time"
 
 )
+
+// createImagePart creates a multipart form file part with Content-Type: image/jpeg
+// (Go's default CreateFormFile uses application/octet-stream).
+func createImagePart(writer *multipart.Writer, fieldName, filename string) (io.Writer, error) {
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition",
+		fmt.Sprintf(`form-data; name=%q; filename=%q`, fieldName, filename))
+	h.Set("Content-Type", "image/jpeg")
+	return writer.CreatePart(h)
+}
 
 // Shared HTTP client with connection pooling for all API requests.
 var apiClient = &http.Client{
@@ -45,8 +56,9 @@ type KillData struct {
 	Level    int     `json:"level"`
 	Faction  string  `json:"faction"`
 	Weapon   string  `json:"weapon"`
-	BodyPart string  `json:"bodyPart"`
-	Distance float64 `json:"distance"`
+	BodyPart     string  `json:"bodyPart"`
+	BodyPartSide string  `json:"bodyPartSide"`
+	Distance     float64 `json:"distance"`
 	Status   string  `json:"status"`
 }
 
@@ -209,7 +221,7 @@ func UploadScreenshotData(jpegData []byte, cfg *Config) (*OCRResponse, error) {
 		return nil, err
 	}
 
-	part, err := writer.CreateFormFile("image", "screenshot.jpg")
+	part, err := createImagePart(writer, "image", "screenshot.jpg")
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +305,7 @@ func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse
 	}
 
 	for i, jpegData := range jpegDatas {
-		part, err := writer.CreateFormFile("images", fmt.Sprintf("screenshot_%d.jpg", i))
+		part, err := createImagePart(writer, "images", fmt.Sprintf("screenshot_%d.jpg", i))
 		if err != nil {
 			return nil, err
 		}

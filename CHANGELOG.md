@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.7 (2026-04-22)
+
+### SPT-Block / SPT Block
+- Single Player Tarkov (SPT.Launcher.exe / SPT.Server.exe) wird erkannt und blockt Captures
+- SPT-Kills sind keine Online-Kills und werden nicht hochgeladen
+- Single Player Tarkov (SPT.Launcher.exe / SPT.Server.exe) is detected and blocks captures
+- SPT kills are not online kills and will not be uploaded
+
+### Upload-Fix / Upload Fix
+- Content-Type wird jetzt korrekt als image/jpeg gesetzt (vorher application/octet-stream)
+- Server muss nicht mehr auf Dateiendung zurueckfallen
+- Content-Type is now correctly set as image/jpeg (previously application/octet-stream)
+- Server no longer needs to fall back to file extension
+
+### Kill-Daten / Kill Data
+- Feld bodyPartSide wird jetzt an den Server weitergegeben
+- Field bodyPartSide is now forwarded to the server
+
+---
+
 ## 1.0.6 (2026-04-12)
 
 ### Automatisches Self-Update / Automatic Self-Update

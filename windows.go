@@ -114,7 +114,9 @@ func IsAlreadyRunning() bool {
 // skipTarkovCheck can be set to true via admin build tag to skip the process check.
 var skipTarkovCheck bool
 
-// IsTarkovRunning checks if EscapeFromTarkov.exe is currently running
+// IsTarkovRunning checks if EscapeFromTarkov.exe is currently running.
+// Returns false if SPT (Single Player Tarkov) is detected — SPT kills
+// are not valid online game kills and must not be uploaded.
 func IsTarkovRunning() bool {
 	if skipTarkovCheck {
 		return true
@@ -134,13 +136,24 @@ func IsTarkovRunning() bool {
 		return false
 	}
 
+	tarkovFound := false
+	sptFound := false
 	for {
 		exeName := syscall.UTF16ToString(entry.ExeFile[:])
-		// Check for Tarkov - also check partial match in case of different naming
+		lower := strings.ToLower(exeName)
+
 		if strings.EqualFold(exeName, "EscapeFromTarkov.exe") ||
-			strings.Contains(strings.ToLower(exeName), "escapefromtarkov") {
+			strings.Contains(lower, "escapefromtarkov") {
 			debugLog("[TARKOV] Found: %s\n", exeName)
-			return true
+			tarkovFound = true
+		}
+
+		// SPT (Single Player Tarkov) — block captures, kills aren't online
+		if strings.EqualFold(exeName, "SPT.Launcher.exe") ||
+			strings.EqualFold(exeName, "SPT.Server.exe") ||
+			strings.HasPrefix(lower, "spt.") {
+			debugLog("[TARKOV] SPT detected: %s\n", exeName)
+			sptFound = true
 		}
 
 		ret, _, _ = procProcess32NextW.Call(snapshot, uintptr(unsafe.Pointer(&entry)))
@@ -149,7 +162,10 @@ func IsTarkovRunning() bool {
 		}
 	}
 
-	return false
+	if sptFound {
+		return false
+	}
+	return tarkovFound
 }
 
 // Callbacks registered once to avoid syscall.NewCallback memory leak
