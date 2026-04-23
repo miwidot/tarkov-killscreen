@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.8 (2026-04-23)
+
+### API-Umstellung / API Migration
+- Die Killcounter-API hat eine eigene Domain: `kc.tarkov-stammtisch.de` (Live) und `kcdev.tarkov-stammtisch.de` (Dev)
+- Trennt die Killcounter-Infrastruktur von der Haupt-Tarkov-Stammtisch-Seite
+- Keine Aktion noetig — Update installieren reicht
+
+- The kill counter API now has its own domain: `kc.tarkov-stammtisch.de` (live) and `kcdev.tarkov-stammtisch.de` (dev)
+- Separates kill counter infrastructure from the main Tarkov-Stammtisch site
+- No action needed — just install the update
+
+---
+
 ## 1.0.7 (2026-04-22)
 
 ### SPT-Block / SPT Block

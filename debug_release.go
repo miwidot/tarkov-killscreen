@@ -12,4 +12,4 @@ package main
 var debugMode = false
 
 // APIURL is the production API endpoint, hardcoded in release builds.
-const APIURL = "https://tarkov-stammtisch.de/api/ocr"
+const APIURL = "https://kc.tarkov-stammtisch.de/api/ocr"
