@@ -3,15 +3,22 @@
 ## 1.0.9 (2026-05-06)
 
 ### Robusterer Verbindungsaufbau / More Robust Connectivity
-- Bei DNS-Fehlern wird automatisch ein alternativer DNS-Resolver verwendet
-- Bei Erreichbarkeitsproblemen wird auf einen Backup-Endpoint ausgewichen
-- Schuetzt vor kaputten ISP-/Router-DNS-Konfigurationen und Registry-Ausfaellen
+- Bei DNS-Fehlern wird automatisch Cloudflare DNS (1.1.1.1) als Fallback verwendet
+- Bei Erreichbarkeitsproblemen wird automatisch auf einen Backup-Endpoint ausgewichen
+- Schuetzt vor kaputten ISP-/Router-DNS-Konfigurationen und groesseren Internet-Stoerungen
 - Im Normalbetrieb kein Performance-Overhead — Fallback greift nur wenn der primaere Pfad fehlschlaegt
 
-- On DNS errors, an alternative DNS resolver is used automatically
-- On connectivity issues, requests fall over to a backup endpoint
-- Protects against broken ISP/router DNS configurations and registry outages
+- On DNS errors, Cloudflare DNS (1.1.1.1) is used automatically as fallback
+- On connectivity issues, requests fall over to a backup endpoint automatically
+- Protects against broken ISP/router DNS configurations and broader internet outages
 - Zero performance overhead in normal operation — fallback only kicks in when the primary path fails
+
+### User-Agent Header
+- HTTP-Requests senden jetzt einen aussagekraeftigen User-Agent mit Versions-Info
+- Hilft uns beim Debugging und beim Erkennen veralteter Clients in Server-Logs
+
+- HTTP requests now send a descriptive User-Agent including version info
+- Helps with debugging and identifying outdated clients in server logs
 
 ---
 

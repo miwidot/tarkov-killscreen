@@ -108,13 +108,33 @@ func asDNSError(err error, target **net.DNSError) bool {
 	return false
 }
 
-// newFallbackTransport returns an http.Transport that uses our DNS fallback.
-func newFallbackTransport() *http.Transport {
-	return &http.Transport{
+// newFallbackTransport returns an http.RoundTripper that uses our DNS fallback
+// and stamps a useful User-Agent on every outgoing request.
+func newFallbackTransport() http.RoundTripper {
+	base := &http.Transport{
 		DialContext:           dialContextWithFallback,
 		MaxIdleConnsPerHost:   2,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
+	return &userAgentTransport{base: base}
+}
+
+// userAgentTransport sets a descriptive User-Agent on outgoing requests
+// (replaces Go's default "Go-http-client/1.1") so server logs identify the
+// client and version. Existing User-Agent headers are preserved.
+type userAgentTransport struct {
+	base http.RoundTripper
+}
+
+func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", buildUserAgent())
+	}
+	return t.base.RoundTrip(req)
+}
+
+func buildUserAgent() string {
+	return fmt.Sprintf("TarkovKillScreen/%s (Windows; +github.com/%s)", CurrentVersion, GithubRepo)
 }

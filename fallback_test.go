@@ -104,6 +104,48 @@ func TestDoWithFallback_HeadersForwarded(t *testing.T) {
 	}
 }
 
+func TestUserAgent_SetByDefault(t *testing.T) {
+	got := ""
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("User-Agent")
+	}))
+	defer server.Close()
+
+	req, _ := http.NewRequest("GET", server.URL, nil)
+	resp, err := apiClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	if !strings.HasPrefix(got, "TarkovKillScreen/") {
+		t.Fatalf("expected TarkovKillScreen/<ver> User-Agent, got %q", got)
+	}
+	if !strings.Contains(got, CurrentVersion) {
+		t.Fatalf("User-Agent should include version %s, got %q", CurrentVersion, got)
+	}
+}
+
+func TestUserAgent_PreservesExisting(t *testing.T) {
+	got := ""
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("User-Agent")
+	}))
+	defer server.Close()
+
+	req, _ := http.NewRequest("GET", server.URL, nil)
+	req.Header.Set("User-Agent", "custom-agent/1.0")
+	resp, err := apiClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	if got != "custom-agent/1.0" {
+		t.Fatalf("explicit User-Agent should be preserved, got %q", got)
+	}
+}
+
 func TestDoWithFallback_5xxNotRetried(t *testing.T) {
 	primaryHits := 0
 	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
