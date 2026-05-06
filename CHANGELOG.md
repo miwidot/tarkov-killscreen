@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.9 (2026-05-06)
+
+### Robusterer Verbindungsaufbau / More Robust Connectivity
+- Bei DNS-Fehlern wird automatisch ein alternativer DNS-Resolver verwendet
+- Bei Erreichbarkeitsproblemen wird auf einen Backup-Endpoint ausgewichen
+- Schuetzt vor kaputten ISP-/Router-DNS-Konfigurationen und Registry-Ausfaellen
+- Im Normalbetrieb kein Performance-Overhead — Fallback greift nur wenn der primaere Pfad fehlschlaegt
+
+- On DNS errors, an alternative DNS resolver is used automatically
+- On connectivity issues, requests fall over to a backup endpoint
+- Protects against broken ISP/router DNS configurations and registry outages
+- Zero performance overhead in normal operation — fallback only kicks in when the primary path fails
+
+---
+
 ## 1.0.8 (2026-04-23)
 
 ### API-Umstellung / API Migration

@@ -42,9 +42,64 @@ func createImagePart(writer *multipart.Writer, fieldName, filename string) (io.W
 }
 
 // Shared HTTP client with connection pooling for all API requests.
+// Uses dialContextWithFallback (dns_fallback.go) so DNS issues fall back
+// to Cloudflare 1.1.1.1 instead of failing outright.
 var apiClient = &http.Client{
 	Timeout:   120 * time.Second,
-	Transport: &http.Transport{MaxIdleConnsPerHost: 2},
+	Transport: newFallbackTransport(),
+}
+
+// apiURLs returns the candidate URLs for an API call: primary first, backup
+// (if configured) second. The savePath flag swaps /api/ocr for the save path.
+func apiURLs(savePath bool) []string {
+	urls := []string{APIURL}
+	if APIBackupURL != "" {
+		urls = append(urls, APIBackupURL)
+	}
+	if savePath {
+		for i, u := range urls {
+			urls[i] = strings.Replace(u, "/api/ocr", "/api/kills/save", 1)
+		}
+	}
+	return urls
+}
+
+// doWithFallback POSTs body to each URL in turn, falling back on transport
+// errors (DNS, connect, TLS). Returns the first response that arrives at
+// the server (any HTTP status code). The response body is returned drained
+// and closed.
+func doWithFallback(urls []string, body []byte, headers http.Header) (int, []byte, error) {
+	var lastErr error
+	for i, target := range urls {
+		req, err := http.NewRequest("POST", target, bytes.NewReader(body))
+		if err != nil {
+			return 0, nil, err
+		}
+		for k, v := range headers {
+			req.Header[k] = v
+		}
+
+		resp, err := apiClient.Do(req)
+		if err != nil {
+			lastErr = err
+			if i < len(urls)-1 {
+				fmt.Printf("[NETWORK] %s failed (%v), trying backup\n", target, err)
+				continue
+			}
+			return 0, nil, fmt.Errorf("request failed: %v", err)
+		}
+
+		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
+		resp.Body.Close()
+		if readErr != nil {
+			return 0, nil, fmt.Errorf("failed to read response: %v", readErr)
+		}
+		if i > 0 {
+			fmt.Printf("[NETWORK] Used backup host: %s\n", target)
+		}
+		return resp.StatusCode, respBody, nil
+	}
+	return 0, nil, lastErr
 }
 
 // KillData represents a single kill entry returned by the OCR API.
@@ -231,35 +286,27 @@ func UploadScreenshotData(jpegData []byte, cfg *Config) (*OCRResponse, error) {
 
 	writer.Close()
 
-	req, err := http.NewRequest("POST", APIURL, &body)
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer "+token)
+	headers.Set("Content-Type", writer.FormDataContentType())
+	if id := GetDeviceID(); id != "" {
+		headers.Set("X-Device-ID", id)
+	}
+
+	statusCode, respBody, err := doWithFallback(apiURLs(false), body.Bytes(), headers)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	setDeviceHeader(req)
-
-	resp, err := apiClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %v", err)
-	}
-
-	debugLog("[UPLOAD] Response status: %d\n", resp.StatusCode)
+	debugLog("[UPLOAD] Response status: %d\n", statusCode)
 	debugLog("[UPLOAD] Response body: %s\n", string(respBody))
 
-	if resp.StatusCode == 403 {
+	if statusCode == 403 {
 		return nil, checkDeviceLockError(respBody)
 	}
 
-	if resp.StatusCode != 200 {
-		return nil, parseAPIError(resp.StatusCode, respBody)
+	if statusCode != 200 {
+		return nil, parseAPIError(statusCode, respBody)
 	}
 
 	var ocrResp OCRResponse
@@ -317,35 +364,27 @@ func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse
 
 	writer.Close()
 
-	req, err := http.NewRequest("POST", APIURL, &body)
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer "+token)
+	headers.Set("Content-Type", writer.FormDataContentType())
+	if id := GetDeviceID(); id != "" {
+		headers.Set("X-Device-ID", id)
+	}
+
+	statusCode, respBody, err := doWithFallback(apiURLs(false), body.Bytes(), headers)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	setDeviceHeader(req)
-
-	resp, err := apiClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %v", err)
-	}
-
-	debugLog("[UPLOAD] Response status: %d\n", resp.StatusCode)
+	debugLog("[UPLOAD] Response status: %d\n", statusCode)
 	debugLog("[UPLOAD] Response body: %s\n", string(respBody))
 
-	if resp.StatusCode == 403 {
+	if statusCode == 403 {
 		return nil, checkDeviceLockError(respBody)
 	}
 
-	if resp.StatusCode != 200 {
-		return nil, parseAPIError(resp.StatusCode, respBody)
+	if statusCode != 200 {
+		return nil, parseAPIError(statusCode, respBody)
 	}
 
 	var ocrResp OCRResponse
@@ -448,33 +487,22 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 
 	fmt.Printf("[SAVE] Saving %d kills...\n", ocrResp.Data.TotalKills) // User-facing status
 
-	// Build save URL (replace /api/ocr with /api/kills/save)
-	saveURL := strings.Replace(APIURL, "/api/ocr", "/api/kills/save", 1)
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer "+token)
+	headers.Set("Content-Type", "application/json")
+	if id := GetDeviceID(); id != "" {
+		headers.Set("X-Device-ID", id)
+	}
 
-	req, err := http.NewRequest("POST", saveURL, bytes.NewBuffer(jsonBody))
+	statusCode, respBody, err := doWithFallback(apiURLs(true), jsonBody, headers)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-	setDeviceHeader(req)
-
-	resp, err := apiClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("save request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read save response: %v", err)
-	}
-
-	debugLog("[SAVE] Response status: %d\n", resp.StatusCode)
+	debugLog("[SAVE] Response status: %d\n", statusCode)
 	debugLog("[SAVE] Response body: %s\n", string(respBody))
 
-	if resp.StatusCode == 403 {
+	if statusCode == 403 {
 		return nil, checkDeviceLockError(respBody)
 	}
 
@@ -483,7 +511,7 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 		return nil, fmt.Errorf("failed to parse save response: %v", err)
 	}
 
-	if resp.StatusCode != 200 || !saveResp.Success {
+	if statusCode != 200 || !saveResp.Success {
 		if saveResp.Error != "" {
 			// Check for event-related errors
 			if IsEventError(saveResp.Error) {
@@ -491,7 +519,7 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 			}
 			return nil, fmt.Errorf("save error: %s", saveResp.Error)
 		}
-		return nil, fmt.Errorf("save failed: %d", resp.StatusCode)
+		return nil, fmt.Errorf("save failed: %d", statusCode)
 	}
 
 	fmt.Printf("[SAVE] Saved! RaidID: %s\n", saveResp.RaidID) // User-facing success

@@ -14,6 +14,9 @@ var debugMode = true
 // APIURL points to the dev API in debug builds.
 const APIURL = "https://kcdev.tarkov-stammtisch.de/api/ocr"
 
+// APIBackupURL is empty for dev — only one dev host needed.
+const APIBackupURL = ""
+
 func init() {
 	// Use separate Credential Manager key so debug and release don't overwrite each other
 	credentialTarget = "TarkovScreenshoter_APIToken_Dev"
