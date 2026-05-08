@@ -42,6 +42,7 @@ var (
 	procIsIconic                 = user32.NewProc("IsIconic")
 	procMonitorFromWindow        = user32.NewProc("MonitorFromWindow")
 	procGetMonitorInfoW          = user32.NewProc("GetMonitorInfoW")
+	procGetForegroundWindow      = user32.NewProc("GetForegroundWindow")
 	procOpenProcessToken         = advapi32.NewProc("OpenProcessToken")
 	procGetTokenInformation      = advapi32.NewProc("GetTokenInformation")
 	procShellExecuteW            = shell32.NewProc("ShellExecuteW")
@@ -166,6 +167,62 @@ func IsTarkovRunning() bool {
 		return false
 	}
 	return tarkovFound
+}
+
+// IsTarkovForeground reports whether the active foreground window belongs
+// to the Tarkov process. Used to skip captures when the user is alt-tabbed
+// to Twitch / YouTube / etc. while Tarkov is still running in background.
+//
+// The admin build skips this check (skipTarkovCheck == true) so devs can
+// test outside of Tarkov.
+func IsTarkovForeground() bool {
+	if skipTarkovCheck {
+		return true
+	}
+
+	hwnd, _, _ := procGetForegroundWindow.Call()
+	if hwnd == 0 {
+		return false
+	}
+
+	var pid uint32
+	procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+	if pid == 0 {
+		return false
+	}
+
+	// Look up the exe name for that PID via the process snapshot
+	snapshot, _, _ := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
+	if snapshot == 0 || snapshot == ^uintptr(0) {
+		return false
+	}
+	defer procCloseHandle.Call(snapshot)
+
+	var entry PROCESSENTRY32W
+	entry.Size = uint32(unsafe.Sizeof(entry))
+
+	ret, _, _ := procProcess32FirstW.Call(snapshot, uintptr(unsafe.Pointer(&entry)))
+	if ret == 0 {
+		return false
+	}
+
+	for {
+		if entry.ProcessID == pid {
+			exeName := syscall.UTF16ToString(entry.ExeFile[:])
+			lower := strings.ToLower(exeName)
+			if strings.EqualFold(exeName, "EscapeFromTarkov.exe") ||
+				strings.Contains(lower, "escapefromtarkov") {
+				return true
+			}
+			debugLog("[FOREGROUND] Active window is %s (PID %d), not Tarkov\n", exeName, pid)
+			return false
+		}
+		ret, _, _ = procProcess32NextW.Call(snapshot, uintptr(unsafe.Pointer(&entry)))
+		if ret == 0 {
+			break
+		}
+	}
+	return false
 }
 
 // Callbacks registered once to avoid syscall.NewCallback memory leak
@@ -360,8 +417,6 @@ var imageViewerProcesses = []string{
 	"xsplit.exe",
 	"xsplitbroadcaster.exe",
 	"xsplitgamecaster.exe",
-	"gamebar.exe",       // Xbox Game Bar
-	"gamebarpresencewriter.exe",
 	"d3dgear.exe",       // D3DGear
 	"litecam.exe",
 	"raptr.exe",         // AMD Raptr/Gaming Evolved

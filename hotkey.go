@@ -349,6 +349,13 @@ func captureScreen() {
 		return
 	}
 
+	// Check if Tarkov is the foreground window — skip if user is alt-tabbed
+	// to Twitch, YouTube, browser, etc. (otherwise we'd capture random screens)
+	if !IsTarkovForeground() {
+		debugLn("[CAPTURE] Tarkov is running but not foreground, ignoring")
+		return
+	}
+
 	// Check if image viewer is running (re-capture prevention)
 	// Skip in admin/debug builds so developer can test with image viewers open
 	if !debugMode {

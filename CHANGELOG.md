@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.10 (2026-05-08)
+
+### Fix: Capture nur wenn Tarkov im Vordergrund / Capture only when Tarkov is foreground
+- Captures werden nur noch gemacht wenn Tarkov das aktive Fenster ist
+- Verhindert versehentliche Uploads von Twitch / YouTube / Browser wenn Tarkov nur im Hintergrund laeuft
+- Captures only happen when Tarkov is the active foreground window
+- Prevents accidental uploads of Twitch / YouTube / browser screens when Tarkov is only running in the background
+
+### Fix: Xbox Game Bar nicht mehr in Blocklist / Xbox Game Bar removed from blocklist
+- `gamebar.exe` und `gamebarpresencewriter.exe` aus der Blocklist entfernt
+- War unnoetig: laeuft auf jedem Windows by default und triggert keinen echten Re-Capture-Schutz
+- `gamebar.exe` and `gamebarpresencewriter.exe` removed from the blocklist
+- Was unnecessary: runs on every Windows by default and never actually triggered a re-capture issue
+
+### Diagnose-Tool / Diagnostic Tool
+- Neues Tool `diagnose.exe` zum Pruefen warum Captures eventuell blockiert werden
+- Listet nur Programme die WIRKLICH blocken (Hintergrundprozesse ohne sichtbares Fenster werden ignoriert)
+- New tool `diagnose.exe` to check why captures may be blocked
+- Lists only programs that ACTUALLY block (background processes without visible windows are ignored)
+
+---
+
 ## 1.0.9 (2026-05-06)
 
 ### Robusterer Verbindungsaufbau / More Robust Connectivity
