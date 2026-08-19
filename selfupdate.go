@@ -141,15 +141,17 @@ func findExeAssetURL(release GithubRelease) (string, error) {
 		return "", fmt.Errorf("cannot parse release: %w", err)
 	}
 
-	// Find the exe asset
+	// Find the screenshoter exe asset by exact name match.
+	// We deliberately don't accept any *.exe in the release because releases
+	// can ship additional tools (e.g. diagnose.exe) that must not be picked
+	// up as the main app's update.
 	for _, asset := range fullRelease.Assets {
-		name := strings.ToLower(asset.Name)
-		if strings.HasSuffix(name, ".exe") && !strings.Contains(name, "debug") && !strings.Contains(name, "admin") {
+		if strings.EqualFold(asset.Name, "screenshoter.exe") {
 			return asset.BrowserDownloadURL, nil
 		}
 	}
 
-	return "", fmt.Errorf("no exe asset found in release %s", release.TagName)
+	return "", fmt.Errorf("no screenshoter.exe asset found in release %s", release.TagName)
 }
 
 // downloadFile downloads a URL to a local file with progress logging.

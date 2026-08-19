@@ -54,6 +54,38 @@ goto :do_build
 set GOOS=windows
 set GOARCH=amd64
 
+:: Version resource is derived from version.go so the PE metadata can never
+:: drift away from the version the app reports and updates against.
+set VERSION=
+for /f "tokens=2 delims==" %%A in ('findstr /c:"CurrentVersion =" version.go') do (
+    for /f "tokens=1 delims= " %%B in ("%%A") do set VERSION=%%~B
+)
+if "%VERSION%"=="" (
+    echo [ERROR] Could not read CurrentVersion from version.go
+    pause
+    exit /b 1
+)
+
+set GOWINRES=go-winres
+where /q go-winres || set GOWINRES=%USERPROFILE%\go\bin\go-winres.exe
+
+echo [RES] Generating version resource for %VERSION%...
+
+:: The --file-version/--product-version flags cover RT_VERSION but not the
+:: manifest's assemblyIdentity, so that one is substituted into a scratch copy.
+:: The copy has to stay inside winres\ because icon paths are resolved relative
+:: to the json file.
+powershell -NoProfile -Command "(Get-Content 'winres\winres.json' -Raw) -replace '\"version\": \"0.0.0.0\"', '\"version\": \"%VERSION%.0\"' | Set-Content -NoNewline 'winres\.build.json'"
+
+%GOWINRES% make --in winres\.build.json --arch amd64 --file-version %VERSION%.0 --product-version %VERSION%.0
+set RES_STATUS=%errorlevel%
+del /q winres\.build.json 2>nul
+if not "%RES_STATUS%"=="0" (
+    echo [ERROR] go-winres failed! Install with: go install github.com/tc-hib/go-winres@latest
+    pause
+    exit /b 1
+)
+
 go build %TAGS% -ldflags "%LDFLAGS%" -o %OUTFILE%
 if errorlevel 1 (
     echo [ERROR] Build failed!

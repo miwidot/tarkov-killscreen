@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.0.11 (2026-08-20)
+
+### Hinweis: Virenscanner-Fehlalarm / Note: Antivirus False Positive
+- Einzelne Virenscanner melden die Exe faelschlich als `Trojan-Spy.WinGo.Agent` oder aehnlich
+- Grund: die App macht Screenshots, liest eine globale Taste mit und laedt Bilder hoch — genau dieses Verhalten stufen manche Scanner pauschal als Spionage-Software ein, unabhaengig davon wofuer es benutzt wird
+- Der Name `Agent` bedeutet in der Scanner-Sprache "keiner bekannten Schadsoftware zuzuordnen", es ist also kein Fund eines konkreten Virus
+- Die Exe ist mit einem Zertifikat auf Martin Wilke signiert, der Quellcode ist vollstaendig einsehbar
+- Details und Pruefschritte stehen im README unter "Antivirus False Positives"
+- Ein Fehlalarm-Report ist bei den betroffenen Herstellern eingereicht
+
+- Some antivirus engines falsely flag the exe as `Trojan-Spy.WinGo.Agent` or similar
+- Reason: the app takes screenshots, watches a global hotkey and uploads images — some scanners classify exactly this behaviour as spyware regardless of what it is used for
+- The name `Agent` is scanner shorthand for "cannot be attributed to any known malware", so it is not a hit on an actual virus
+- The exe is signed with a certificate issued to Martin Wilke and the full source code is public
+- Details and verification steps are in the README under "Antivirus False Positives"
+- A false positive report has been filed with the affected vendors
+
+### Fix: Korrekte Versions-Angabe in der Exe / Correct version info in the exe
+- Die Datei-Eigenschaften zeigten noch 1.0.3 obwohl 1.0.10 installiert war
+- Copyright-Feld war leer, Anwendungsname im Manifest veraltet
+- Version wird jetzt beim Bauen automatisch aus dem Quellcode uebernommen und kann nicht mehr abweichen
+- Saubere Datei-Eigenschaften helfen zusaetzlich gegen Fehlalarme von Virenscannern
+
+- File properties still showed 1.0.3 even though 1.0.10 was installed
+- Copyright field was empty, application name in the manifest outdated
+- The version is now taken from the source code automatically at build time and can no longer drift
+- Clean file properties also help against antivirus false positives
+
+### Fix: Update laedt garantiert die richtige Datei / Update reliably picks the right file
+- Das Selbst-Update sucht im Release jetzt gezielt nach `screenshoter.exe`
+- Vorher wurde die erste passende `.exe` genommen — sobald ein Release Zusatz-Tools wie `diagnose.exe` enthaelt, haette das die falsche Datei sein koennen
+
+- Self-update now looks for `screenshoter.exe` by exact name in the release
+- Previously it took the first matching `.exe` — once a release ships extra tools such as `diagnose.exe`, that could have been the wrong file
+
+---
+
 ## 1.0.10 (2026-05-08)
 
 ### Fix: Capture nur wenn Tarkov im Vordergrund / Capture only when Tarkov is foreground

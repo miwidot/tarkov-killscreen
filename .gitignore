@@ -44,3 +44,6 @@ temp/
 
 # Go build cache
 vendor/
+
+# Scratch copy created by build.sh / build.bat for version substitution
+winres/.build.json

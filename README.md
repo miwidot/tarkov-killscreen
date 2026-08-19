@@ -60,6 +60,83 @@ To minimize server costs, the app filters invalid screenshots locally before upl
 3. On first run, enter your API token (get it from [tarkov-stammtisch.de](https://tarkov-stammtisch.de/en/profile/killcounter))
 4. The app starts in the system tray, ready to capture
 
+## Antivirus False Positives
+
+A small number of antivirus engines flag `screenshoter.exe` as malware, typically
+under a name like `Trojan-Spy.WinGo.Agent`. This is a false positive. Here is
+exactly why it happens, so you can judge it for yourself instead of taking our
+word for it.
+
+### Why it happens
+
+Antivirus engines do not only match known malware — they also classify programs
+by what they are *capable* of. This app does five things that, taken together,
+look identical to an information stealer:
+
+| What the app does | How a scanner reads it |
+|---|---|
+| Captures the screen | Screen grabbing |
+| Watches a global hotkey (Print Screen) | Keyboard monitoring |
+| Uploads images to a server | Data exfiltration |
+| Optionally starts with Windows | Persistence |
+| Stores your API token in Credential Manager | Credential access |
+
+That is the honest description of a kill screen uploader. It is also the honest
+description of spyware. A scanner that has never seen this specific program has
+no way to tell the difference from behaviour alone, so some err on the side of
+warning you.
+
+Two things make it more likely: the app is written in Go, and a large share of
+today's commodity malware is written in Go too, so Go binaries get generic
+signatures thrown at them. And every new release starts with zero reputation —
+few downloads, so nothing vouches for the file yet.
+
+### Decoding the detection name
+
+`Trojan-Spy.WinGo.Agent` is not the name of a virus. It breaks down as:
+
+- `Trojan-Spy` — the category for screen/input capturing behaviour
+- `WinGo` — a Windows executable written in Go
+- `Agent` — scanner shorthand for **no known malware family could be matched**
+
+In other words: "a Go program on Windows that can capture the screen, belonging
+to nothing we recognise." A real detection names a real family.
+
+### How to verify this yourself
+
+Do not trust this README either — check it:
+
+1. **Check the detection ratio.** Upload the exe to [virustotal.com](https://www.virustotal.com)
+   or search for its SHA256. A handful of hits out of ~72 engines, all with
+   generic names, is the signature of a false positive. A genuine threat is
+   flagged by most major engines with a consistent family name.
+2. **Check the signature.** Right-click `screenshoter.exe` → Properties →
+   Digital Signatures. It is signed by *Open Source Developer Martin Wilke*
+   (issued by Certum). Malware distributors do not sign with a certificate that
+   identifies them by name. In PowerShell:
+   ```powershell
+   Get-AuthenticodeSignature .\screenshoter.exe | Format-List Status, SignerCertificate
+   ```
+   Status must read `Valid`.
+3. **Read the source.** This entire repository is the program. The upload
+   endpoint, what gets sent, and when, are all in plain Go — see `upload.go`
+   and `hotkey.go`. See also "What We Do NOT Do" below.
+4. **Watch the traffic.** The app only talks to the kill counter API and the
+   GitHub releases API. Any firewall or Wireshark will confirm it.
+
+### What we do about it
+
+False positive reports are filed with the affected vendors, and each release
+ships with correct, signed file metadata so there is as little to be suspicious
+of as possible. Detections usually disappear after a vendor reviews the report
+or once a release has enough downloads to build reputation.
+
+If your antivirus quarantines the app and you have satisfied yourself with the
+checks above, add an exclusion for `screenshoter.exe`. If you are not
+comfortable doing that, please do not — build it from source instead
+(see [Building from Source](#building-from-source)), or simply do not use it.
+Do not disable your antivirus.
+
 ## Usage
 
 1. Start the app (it will minimize to system tray)
@@ -110,6 +187,10 @@ screenshoter/
 ### Requirements
 - Go 1.24 or later
 - Windows 10/11 (uses Windows-specific APIs)
+- [go-winres](https://github.com/tc-hib/go-winres) — generates the icon and version
+  resource: `go install github.com/tc-hib/go-winres@latest`. The build scripts derive
+  the version from `version.go`, so the embedded file properties always match the
+  release.
 
 ### Build Commands
 

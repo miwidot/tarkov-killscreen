@@ -40,6 +40,36 @@ esac
 export GOOS=windows
 export GOARCH=amd64
 
+# Version resource is derived from version.go so the PE metadata can never
+# drift away from the version the app reports and updates against.
+VERSION=$(sed -n 's/.*CurrentVersion = "\([^"]*\)".*/\1/p' version.go)
+if [ -z "$VERSION" ]; then
+    echo "[ERROR] Could not read CurrentVersion from version.go"
+    exit 1
+fi
+
+GO_WINRES="go-winres"
+if ! command -v "$GO_WINRES" >/dev/null 2>&1; then
+    GO_WINRES="$(go env GOPATH)/bin/go-winres"
+fi
+
+echo "[RES] Generating version resource for $VERSION..."
+
+# The --file-version/--product-version flags cover RT_VERSION but not the
+# manifest's assemblyIdentity, so that one is substituted into a scratch copy.
+# The copy has to stay inside winres/ because icon paths are resolved relative
+# to the json file.
+BUILD_JSON="winres/.build.json"
+sed "s/\"version\": \"0.0.0.0\"/\"version\": \"$VERSION.0\"/" winres/winres.json > "$BUILD_JSON"
+
+"$GO_WINRES" make --in "$BUILD_JSON" --arch amd64 --file-version "$VERSION.0" --product-version "$VERSION.0"
+RES_STATUS=$?
+rm -f "$BUILD_JSON"
+if [ $RES_STATUS -ne 0 ]; then
+    echo "[ERROR] go-winres failed! Install with: go install github.com/tc-hib/go-winres@latest"
+    exit 1
+fi
+
 echo "[BUILD] go build $TAGS -o $OUTFILE"
 go build $TAGS -ldflags "-H=windowsgui -s -w" -o "$OUTFILE"
 if [ $? -ne 0 ]; then
