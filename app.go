@@ -233,8 +233,6 @@ func RunApp() {
 	mainWindow.Run()
 }
 
-// watchClipboardAuto polls the clipboard sequence number to detect new
-// screenshots. This is the legacy capture method, kept as fallback.
 // processBatch uploads all batched screenshots to the OCR API, saves any
 // detected kills, and shows the result notification. Called after the 20s
 // batch timer expires.

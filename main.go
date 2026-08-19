@@ -1,11 +1,15 @@
 // Tarkov Kill Screen Analyzer
 //
-// A Windows system tray application that monitors the clipboard for screenshots
-// and uploads them to an OCR API for kill tracking.
+// A Windows system tray application that captures the kill screen on a
+// user-pressed hotkey and uploads it to an OCR API for kill tracking.
 //
 // This application does NOT interact with Escape from Tarkov in any way.
-// It only reads images from the Windows clipboard (user-initiated screenshots)
-// and uploads them to a web service for text extraction.
+// A capture happens only when the user presses the hotkey while Tarkov is the
+// active foreground window (see hotkey.go). Nothing is captured automatically,
+// in the background, or while any other program is in focus. The clipboard is
+// never read — an earlier version used it, the current one does not.
+//
+// What leaves the machine is documented in TRANSPARENCY.md.
 //
 // Author: miwidot
 // License: MIT

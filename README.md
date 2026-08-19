@@ -273,6 +273,10 @@ Configuration is stored in `%APPDATA%\TarkovKillcounter\config.json`:
 
 ## Security & Privacy
 
+**[TRANSPARENCY.md](TRANSPARENCY.md) documents every piece of data that leaves
+your machine, with a link to the exact line of code for each claim** — including
+what the app reads locally but never transmits.
+
 - **API Token** — Stored in Windows Credential Manager (encrypted by Windows), with AES-GCM encrypted backup in config
 - **Device ID** — UUID v4 stored in `%APPDATA%\TarkovKillcounter\device.id`, sent as `X-Device-ID` header for token binding
 - **Screenshots** — Uploaded via HTTPS only, compressed to JPEG before upload
