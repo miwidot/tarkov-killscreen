@@ -93,7 +93,7 @@ var (
 )
 
 const hotkeyID = 1      // ID for RegisterHotKey
-const maxBatchSize = 10 // Maximum screenshots per batch/upload
+const maxBatchSize = 20 // Maximum screenshots per batch/upload
 
 // registerGlobalHotkey uses RegisterHotKey to claim Print Screen globally.
 // This prevents Windows 11 Snipping Tool from hijacking the key.

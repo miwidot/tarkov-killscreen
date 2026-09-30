@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.12 (2026-09-30)
+
+### Aenderung: Bis zu 20 Screenshots pro Upload / Change: Up to 20 screenshots per upload
+- Das Limit pro Batch wurde von 10 auf 20 Screenshots erhoeht
+- Lange, scrollbare Kill-Listen passen damit in einen einzigen Upload
+- Der automatische Upload startet jetzt erst bei 20 Bildern (oder wie bisher nach 20 Sekunden ohne neuen Screenshot)
+
+- The per-batch limit was raised from 10 to 20 screenshots
+- Long, scrollable kill lists now fit into a single upload
+- The automatic upload now triggers at 20 images (or, as before, after 20 seconds without a new screenshot)
+
+---
+
 ## 1.0.11 (2026-08-20)
 
 ### Hinweis: Virenscanner-Fehlalarm / Note: Antivirus False Positive

@@ -25,7 +25,7 @@ This is functionally identical to a user manually uploading screenshots to a web
 ## Features
 
 - **Hotkey Capture** — Press a configurable hotkey to capture screenshots directly from the game display
-- **Smart Batching** — Collects multiple screenshots within a 20-second window (for scrollable kill lists, max 10 per batch)
+- **Smart Batching** — Collects multiple screenshots within a 20-second window (for scrollable kill lists, max 20 per batch)
 - **Multi-Monitor Support** — Automatically captures from the display where Tarkov is running
 - **Capture Feedback** — Screen flash, sound, and mini-overlay on capture (individually configurable)
 - **Snipping Tool Override** — Automatically disables Windows 11 Snipping Tool when PrintScreen is used
@@ -295,7 +295,7 @@ what the app reads locally but never transmits.
 4. **Validation** — Checks minimum size (800×400), aspect ratio (1.2–3.8), re-capture signature
 5. **Signature Embedding** — Writes 8-byte signature into blue channel pixels (4 magic + 4 CRC32 hash)
 6. **JPEG Compression** — Scales if wider than `max_width`, encodes as JPEG, immediately frees raw image
-7. **Batching** — Adds to batch, resets 20-second timer (max 10 images, auto-uploads at 10)
+7. **Batching** — Adds to batch, resets 20-second timer (max 20 images, auto-uploads at 20)
 8. **Upload** — Multipart POST to `/api/ocr`, frees JPEG buffers during construction
 9. **Save Kills** — POST parsed kill data to `/api/kills/save` with device ID and optional event ID
 10. **Notification** — Overlay popup with kill summary and raid details
