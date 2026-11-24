@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.13 (unveroeffentlicht / unreleased)
+## 1.0.13 (2026-11-24)
 
 ### Sicherheit: Updates werden vor der Installation geprueft / Security: Updates are verified before install
 - Das Selbst-Update prueft jetzt die digitale Signatur der heruntergeladenen Exe
