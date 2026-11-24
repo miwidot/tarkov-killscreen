@@ -1,5 +1,79 @@
 # Changelog
 
+## 1.0.13 (unveroeffentlicht / unreleased)
+
+### Sicherheit: Updates werden vor der Installation geprueft / Security: Updates are verified before install
+- Das Selbst-Update prueft jetzt die digitale Signatur der heruntergeladenen Exe
+- Installiert wird nur, was gueltig signiert und auf `Open Source Developer Martin Wilke` ausgestellt ist
+- Eine ausgetauschte oder veraenderte Datei wird geloescht statt installiert — auch falls das GitHub-Konto des Projekts uebernommen wuerde
+- Vorher wurde nur geprueft, ob die Datei ueberhaupt eine Exe ist
+
+- Self-update now checks the digital signature of the downloaded exe
+- Only a file that is validly signed and issued to `Open Source Developer Martin Wilke` gets installed
+- A swapped or modified file is deleted instead of installed — even if the project's GitHub account were taken over
+- Previously the only check was whether the file is an exe at all
+
+### Sicherheit: Aktuelle Go-Version / Security: Current Go version
+- Gebaut mit Go 1.26.11 statt 1.26.0
+- Damit sind 27 bekannte Schwachstellen der Go-Standardbibliothek behoben, die Verbindungen und die Zertifikatspruefung betrafen
+- `golang.org/x/sys` und weitere Abhaengigkeiten aktualisiert
+
+- Built with Go 1.26.11 instead of 1.26.0
+- This fixes 27 known vulnerabilities in the Go standard library affecting connections and certificate checks
+- `golang.org/x/sys` and other dependencies updated
+
+### Neu: Upload wird bei Verbindungsproblemen wiederholt / New: Upload is retried on connection problems
+- Bricht die Verbindung ab oder antwortet der Server gerade nicht, versucht die App es nach 5, 15 und 30 Sekunden erneut
+- Vorher waren in diesem Fall alle Screenshots des Raids verloren
+- Eine Meldung zeigt an, dass die Screenshots erhalten bleiben
+- Das Speichern der Kills wird nur wiederholt, wenn die Anfrage sicher nicht angekommen ist, damit kein Raid doppelt gezaehlt wird
+
+- If the connection drops or the server is not answering, the app tries again after 5, 15 and 30 seconds
+- Previously all screenshots of that raid were lost in this case
+- A notification tells you the screenshots are being kept
+- Saving the kills is only repeated when the request provably did not arrive, so no raid is counted twice
+
+### Fix: Token-Sicherung ging verloren / Token backup got lost
+- Die Sicherungskopie des Tokens in der `config.json` wurde beim naechsten Speichern der Einstellungen oder bei der Event-Auswahl wieder geloescht oder durch ein altes Token ersetzt
+- Dadurch musste das Token nach einem Aufraeum-Programm wie CCleaner doch neu eingegeben werden
+- Die Sicherung bleibt jetzt erhalten und wird beim Start automatisch repariert, falls sie fehlt oder veraltet ist
+
+- The backup copy of the token in `config.json` was deleted again, or replaced by an old token, the next time settings were saved or an event was selected
+- As a result the token still had to be re-entered after a cleanup tool such as CCleaner
+- The backup is now kept and is repaired automatically on start if it is missing or outdated
+
+### Fix: Snipping-Tool-Einstellung wird korrekt zurueckgesetzt / Snipping Tool setting is restored correctly
+- Die App merkt sich jetzt, wie die Druck-Taste vorher eingestellt war, und stellt genau das wieder her
+- Vorher wurde das Snipping Tool beim Beenden immer eingeschaltet, auch wenn es vorher abgeschaltet war
+- Nach einem Absturz oder Update wird die Einstellung beim naechsten sauberen Beenden nachgeholt
+
+- The app now remembers how the Print Screen key was configured before and restores exactly that
+- Previously the Snipping Tool was always switched on at exit, even if it had been off before
+- After a crash or an update the setting is caught up on the next clean exit
+
+### Fix: "Jetzt verarbeiten" waehrend eines Uploads / "Process Now" during an upload
+- Ein Klick auf "Jetzt verarbeiten" waehrend ein Upload lief konnte dazu fuehren, dass zwei Uploads gleichzeitig liefen
+- Der Klick wird jetzt ignoriert, solange ein Upload laeuft
+
+- Clicking "Process Now" while an upload was running could lead to two uploads running at the same time
+- The click is now ignored while an upload is in progress
+
+### Fix: Sehr kurzes Token / Very short token
+- Ein Token mit weniger als vier Zeichen liess den Upload ohne Fehlermeldung abbrechen
+- Es kommt jetzt die normale Fehlermeldung des Servers
+
+- A token shorter than four characters made the upload abort without any error message
+- The regular server error is shown now
+
+### Doku / Docs
+- `TRANSPARENCY.md` listet jetzt auch auf, was die App auf dem Rechner aendert (Dateien, Registry), und nennt alle Verbindungen inklusive Update-Download und DNS-Ausweichweg
+- README an den aktuellen Code angepasst
+
+- `TRANSPARENCY.md` now also lists what the app changes on your machine (files, registry) and names every connection including the update download and the DNS fallback
+- README brought in line with the current code
+
+---
+
 ## 1.0.12 (2026-09-30)
 
 ### Aenderung: Bis zu 20 Screenshots pro Upload / Change: Up to 20 screenshots per upload

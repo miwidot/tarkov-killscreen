@@ -13,7 +13,7 @@ A lightweight Windows system tray application that helps players track their kil
 - **No automation** - We never send inputs to the game
 
 **What this tool actually does:**
-1. Registers a global hotkey (Print Screen, F12, Scroll Lock, Pause, PageUp, PageDown, Insert, or Delete)
+1. Watches one configurable capture key (Print Screen by default; see [Configuration](#configuration) for the full list)
 2. When user presses the hotkey, captures the screen directly via Windows API
 3. Uploads the screenshot to our web service for OCR text recognition
 4. Displays the extracted kill information to the user
@@ -28,13 +28,14 @@ This is functionally identical to a user manually uploading screenshots to a web
 - **Smart Batching** — Collects multiple screenshots within a 20-second window (for scrollable kill lists, max 20 per batch)
 - **Multi-Monitor Support** — Automatically captures from the display where Tarkov is running
 - **Capture Feedback** — Screen flash, sound, and mini-overlay on capture (individually configurable)
-- **Snipping Tool Override** — Automatically disables Windows 11 Snipping Tool when PrintScreen is used
+- **Snipping Tool Override** — Frees the Print Screen key from the Windows 11 Snipping Tool while it is the capture key, and restores your previous setting afterwards
+- **Upload Retry** — A dropped connection or a server hiccup does not cost you the batch: the upload is retried automatically for about a minute
 - **OCR Analysis** — Sends screenshots to API for text extraction and kill parsing
 - **Kill Tracking** — Saves analyzed kills to user's profile with full kill details
 - **Kill Events** — Participate in community events with automatic kill assignment
 - **Re-Capture Prevention** — Detects screenshots of screenshots via embedded pixel signature
 - **Device Lock** — Token bound to a single device via UUID for abuse protection
-- **Auto-Update** — Notifies when new versions are available (supports pre-releases)
+- **Auto-Update** — Notifies when a new version is available (including pre-releases) and installs it on confirmation, after verifying the download's code signature
 - **Autostart** — Optional Windows autostart via registry
 - **i18n** — UI available in German (default) and English
 - **System Tray** — Runs quietly in the background with session statistics
@@ -121,8 +122,10 @@ Do not trust this README either — check it:
 3. **Read the source.** This entire repository is the program. The upload
    endpoint, what gets sent, and when, are all in plain Go — see `upload.go`
    and `hotkey.go`. See also "What We Do NOT Do" below.
-4. **Watch the traffic.** The app only talks to the kill counter API and the
-   GitHub releases API. Any firewall or Wireshark will confirm it.
+4. **Watch the traffic.** The app only talks to the kill counter API and to
+   GitHub (release list, and the download when you confirm an update). Any
+   firewall or Wireshark will confirm it. The full list of destinations is in
+   [TRANSPARENCY.md](TRANSPARENCY.md).
 
 ### What we do about it
 
@@ -144,6 +147,7 @@ Do not disable your antivirus.
 3. At the end of a raid, press the capture hotkey (default: Print Screen)
 4. If you have many kills (scrollable list), take multiple screenshots
 5. After 20 seconds of no new screenshots, all images are uploaded together
+   (if the connection fails, the app keeps the screenshots and retries by itself)
 6. You'll receive a notification with your kill summary
 
 **Tip:** Use "Process Now" from the tray menu to skip the 20-second wait.
@@ -157,9 +161,9 @@ screenshoter/
 ├── main.go              # Entry point, single-instance check
 ├── app.go               # Core logic: tray menu, batching, upload coordination
 ├── hotkey.go            # Global hotkey registration, screen capture, Snipping Tool override
-├── clipboard.go         # Windows clipboard API (legacy fallback)
 ├── windows.go           # Process enumeration, display mapping, viewer detection
-├── upload.go            # HTTP multipart upload, OCR response parsing, kill save
+├── upload.go            # HTTP multipart upload, OCR response parsing, kill save, retry rules
+├── dns_fallback.go      # HTTP transport: Cloudflare DNS fallback, User-Agent
 ├── config.go            # Configuration file handling (%APPDATA%\TarkovKillcounter)
 ├── credential.go        # Windows Credential Manager + AES-GCM encrypted backup
 ├── device.go            # Device ID generation (UUID v4) for token binding
@@ -168,6 +172,8 @@ screenshoter/
 ├── i18n.go              # Internationalization (DE/EN translations)
 ├── signature.go         # Pixel signature embedding/verification (re-capture detection)
 ├── version.go           # Auto-update checker (GitHub Releases API)
+├── selfupdate.go        # In-place self-update (download, verify, swap exe, restart)
+├── authenticode.go      # Code signature and publisher check for downloaded updates
 ├── splash.go            # Splash screen with cached DIB
 ├── flash.go             # Screen flash effect (Win32 layered window)
 ├── overlay.go           # Mini overlay popup with countdown
@@ -177,7 +183,9 @@ screenshoter/
 ├── log.go               # Debug logging utilities
 ├── admin.go             # Admin build: skip Tarkov check (testing only)
 ├── debug_debug.go       # Debug build: verbose output, dev API URL
-└── debug_release.go     # Release build: quiet output, production API URL
+├── debug_release.go     # Release build: quiet output, production API URL
+├── build.sh / build.bat # Build, embed version resource, sign
+└── tools/diag/          # diagnose.exe: lists programs that currently block captures
 ```
 
 ---
@@ -185,7 +193,8 @@ screenshoter/
 ## Building from Source
 
 ### Requirements
-- Go 1.24 or later
+- Go 1.26 or later (`go.mod` pins the toolchain to 1.26.11; older 1.26.x
+  installs download it automatically on the first build)
 - Windows 10/11 (uses Windows-specific APIs)
 - [go-winres](https://github.com/tc-hib/go-winres) — generates the icon and version
   resource: `go install github.com/tc-hib/go-winres@latest`. The build scripts derive
@@ -219,8 +228,7 @@ GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui -s -w" -tags "admin,d
 github.com/lxn/walk           # Windows GUI library (dialogs, tray icon)
 github.com/lxn/win            # Windows API bindings
 github.com/kbinani/screenshot  # Screen capture
-golang.org/x/image             # Image scaling (CatmullRom)
-golang.org/x/sys               # Windows registry access
+golang.org/x/sys               # Windows registry access, signature verification
 ```
 
 ---
@@ -254,7 +262,7 @@ Configuration is stored in `%APPDATA%\TarkovKillcounter\config.json`:
 
 | Field | Description |
 |-------|-------------|
-| `hotkeys.capture_key` | Capture hotkey: `PrintScreen`, `F12`, `ScrollLock`, `Pause`, `PageUp`, `PageDown`, `Insert`, `Delete` |
+| `hotkeys.capture_key` | Capture hotkey: `PrintScreen`, `F2`–`F12`, `ScrollLock`, `Pause`, `PageUp`, `PageDown`, `Home`, `End`, `Insert`, `Delete`, `Numpad0`–`Numpad9`, `NumpadMultiply`, `NumpadAdd`, `NumpadSubtract`, `NumpadDivide` |
 | `api.enabled` | Enable/disable API uploads |
 | `api.mode` | OCR mode (always `kills`) |
 | `api.max_width` | Max image width before resize (saves bandwidth) |
@@ -267,7 +275,7 @@ Configuration is stored in `%APPDATA%\TarkovKillcounter\config.json`:
 | `autostart` | Start with Windows |
 | `kill_event_id` | Currently selected kill event (empty = no event) |
 
-**Note:** The API token is stored securely in Windows Credential Manager, not in this file. An encrypted backup is kept in the config for recovery (e.g. after CCleaner wipes credentials).
+**Note:** The API token is stored in Windows Credential Manager. A backup copy is kept in this file (`encrypted_token`) so the token survives a cleanup tool wiping the Credential Manager. That backup is AES-encrypted with a key from the public source code, so it only stops casual reading — treat `config.json` like the token itself and do not share it.
 
 ---
 
@@ -277,9 +285,11 @@ Configuration is stored in `%APPDATA%\TarkovKillcounter\config.json`:
 your machine, with a link to the exact line of code for each claim** — including
 what the app reads locally but never transmits.
 
-- **API Token** — Stored in Windows Credential Manager (encrypted by Windows), with AES-GCM encrypted backup in config
+- **API Token** — Stored in Windows Credential Manager (encrypted by Windows). The backup copy in `config.json` is obfuscated, not protected: its key is in the public source
 - **Device ID** — UUID v4 stored in `%APPDATA%\TarkovKillcounter\device.id`, sent as `X-Device-ID` header for token binding
-- **Screenshots** — Uploaded via HTTPS only, compressed to JPEG before upload
+- **Screenshots** — Uploaded via HTTPS only, compressed to JPEG before upload, held in memory only and never written to disk
+- **Updates** — Installed only on confirmation, and only if the downloaded exe carries a valid code signature issued to *Open Source Developer Martin Wilke*
+- **Registry** — Three values under `HKCU` at most: autostart (optional), the Snipping Tool key mapping while Print Screen is the capture key, and a record of its previous state so it can be restored
 - **No Telemetry** — No data collected beyond what you explicitly upload
 - **Open Source** — Full source code available for review
 
@@ -290,21 +300,21 @@ what the app reads locally but never transmits.
 ### Screenshot Processing Pipeline
 
 1. **Hotkey Press** — `WatchHotkey()` polls `GetAsyncKeyState` at 50ms intervals
-2. **Display Detection** — Identifies which monitor Tarkov is running on
-3. **Screen Capture** — `screenshot.CaptureRect()` captures the correct display
-4. **Validation** — Checks minimum size (800×400), aspect ratio (1.2–3.8), re-capture signature
-5. **Signature Embedding** — Writes 8-byte signature into blue channel pixels (4 magic + 4 CRC32 hash)
-6. **JPEG Compression** — Scales if wider than `max_width`, encodes as JPEG, immediately frees raw image
-7. **Batching** — Adds to batch, resets 20-second timer (max 20 images, auto-uploads at 20)
-8. **Upload** — Multipart POST to `/api/ocr`, frees JPEG buffers during construction
-9. **Save Kills** — POST parsed kill data to `/api/kills/save` with device ID and optional event ID
-10. **Notification** — Overlay popup with kill summary and raid details
+2. **Capture Gates** — Tarkov must be running and be the foreground window; no blocked viewer or recorder window may be open
+3. **Display Detection** — Identifies which monitor Tarkov is running on
+4. **Screen Capture** — `screenshot.CaptureRect()` captures the correct display
+5. **Validation** — Checks minimum size (800×400), aspect ratio (1.2–3.8), re-capture signature
+6. **Signature Embedding** — Writes 8-byte signature into blue channel pixels (4 magic + 4 CRC32 hash)
+7. **JPEG Compression** — Scales if wider than `max_width`, encodes as JPEG, immediately frees raw image
+8. **Batching** — Adds to batch, resets 20-second timer (max 20 images, auto-uploads at 20)
+9. **Upload** — Multipart POST to `/api/ocr`. On a connection error or a 5xx/429 answer it is repeated after 5, 15 and 30 seconds
+10. **Save Kills** — POST parsed kill data to `/api/kills/save` with device ID and optional event ID. Repeated only when the request provably did not reach the application (connect failure, 502, 503, 429), so a raid is never saved twice
+11. **Notification** — Overlay popup with kill summary and raid details
 
 ### Memory Management
 
 - Raw RGBA images (~15 MB at 1080p) freed immediately after JPEG compression
-- Single-pass BGR→RGB clipboard conversion (no intermediate copy)
-- JPEG buffers freed during multipart upload construction
+- Only the compressed JPEGs (a few hundred KB each) are kept until the upload has succeeded or all retries are used up
 - Splash screen DIB cached and reused across repaints
 - Overlay fonts created once and reused
 
@@ -319,12 +329,12 @@ what the app reads locally but never transmits.
 
 | DLL | Function | Purpose |
 |-----|----------|---------|
-| user32.dll | RegisterHotKey / UnregisterHotKey | Global hotkey registration |
-| user32.dll | GetAsyncKeyState | Hotkey polling fallback |
+| user32.dll | RegisterHotKey / UnregisterHotKey | Claims Print Screen so the Snipping Tool does not react |
+| user32.dll | GetAsyncKeyState | Polls the capture key |
 | user32.dll | CreateWindowEx / RegisterClassEx | Flash, overlay, splash windows |
 | user32.dll | SetLayeredWindowAttributes | Semi-transparent flash effect |
-| user32.dll | OpenClipboard / CloseClipboard | Clipboard access (legacy fallback) |
 | user32.dll | MonitorFromWindow / GetMonitorInfoW | Multi-monitor display detection |
+| user32.dll | GetForegroundWindow | Capture only while Tarkov is the active window |
 | user32.dll | EnumWindows / GetWindowThreadProcessId | Image viewer detection |
 | kernel32.dll | CreateToolhelp32Snapshot | List running processes |
 | kernel32.dll | CreateMutexW | Single-instance check |
@@ -332,6 +342,11 @@ what the app reads locally but never transmits.
 | gdi32.dll | CreateSolidBrush / CreateFontIndirectW | Overlay rendering |
 | winmm.dll | PlaySoundW | Capture sound feedback |
 | advapi32.dll | CredWriteW / CredReadW / CredDeleteW | Credential Manager |
+| advapi32.dll | OpenProcessToken / GetTokenInformation | Detect whether Tarkov runs elevated |
+| advapi32.dll | RegCreateKeyEx / RegSetValueEx etc. | Autostart, Snipping Tool key mapping |
+| shell32.dll | ShellExecuteW | Open browser, restart after update or as admin |
+| wintrust.dll | WinVerifyTrust | Verify the code signature of a downloaded update |
+| crypt32.dll | CryptQueryObject / CryptMsgGetParam / CertGetNameString | Read who signed a downloaded update |
 
 All APIs used are standard, documented Windows APIs. No undocumented or game-specific APIs are used.
 
