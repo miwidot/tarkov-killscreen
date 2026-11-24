@@ -241,40 +241,105 @@ var hotkeyToVK = map[string]uintptr{
 const snippingToolRegistryKey = `Control Panel\Keyboard`
 const snippingToolValueName = "PrintScreenKeyForSnippingEnabled"
 
-// snippingToolDisabled tracks whether we disabled the Snipping Tool so we can restore it.
-var snippingToolDisabled bool
+// The previous Snipping Tool setting is recorded under our own registry key
+// before it is changed, so it can be put back exactly — also after a crash,
+// a shutdown or a self-update, where the in-process restore never runs.
+const appRegistryKey = `Software\TarkovKillcounter`
+const snippingPrevValueName = "SnippingToolPrevious"
+
+const (
+	snippingPrevEnabled = 1 // value existed and was non-zero
+	snippingPrevAbsent  = 2 // value did not exist (Windows default)
+)
 
 // disableSnippingToolPrintScreen sets the registry value to prevent Windows 11
-// from hijacking PrintScreen for the Snipping Tool.
+// from hijacking PrintScreen for the Snipping Tool, remembering what was there.
 func disableSnippingToolPrintScreen() {
-	key, _, err := registry.CreateKey(registry.CURRENT_USER, snippingToolRegistryKey, registry.SET_VALUE)
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, snippingToolRegistryKey,
+		registry.QUERY_VALUE|registry.SET_VALUE)
 	if err != nil {
 		debugLog("[HOTKEY] Failed to open registry for Snipping Tool: %v\n", err)
 		return
 	}
 	defer key.Close()
 
+	appKey, appKeyExisted, err := registry.CreateKey(registry.CURRENT_USER, appRegistryKey,
+		registry.QUERY_VALUE|registry.SET_VALUE)
+	if err != nil {
+		// Without a place to record the old setting it could not be restored.
+		debugLog("[HOTKEY] Failed to open app registry key: %v\n", err)
+		return
+	}
+	defer appKey.Close()
+
+	var previous uint32
+	current, _, err := key.GetIntegerValue(snippingToolValueName)
+	switch {
+	case err == nil && current == 0:
+		// Already off. Normally that is the user's own choice, or ours from a
+		// run that did not exit cleanly (the record is then still in place).
+		// The exception is the first start after upgrading from <= 1.0.12:
+		// those versions switched it off without a record and always restored
+		// it to "on", so keep that behaviour for them.
+		if !appKeyExisted {
+			appKey.SetDWordValue(snippingPrevValueName, snippingPrevEnabled)
+		}
+		return
+	case err == nil:
+		previous = snippingPrevEnabled
+	case err == registry.ErrNotExist:
+		previous = snippingPrevAbsent
+	default:
+		debugLog("[HOTKEY] Unexpected Snipping Tool registry value: %v\n", err)
+		return
+	}
+
+	if err := appKey.SetDWordValue(snippingPrevValueName, previous); err != nil {
+		debugLog("[HOTKEY] Failed to record Snipping Tool setting: %v\n", err)
+		return
+	}
 	if err := key.SetDWordValue(snippingToolValueName, 0); err != nil {
+		appKey.DeleteValue(snippingPrevValueName)
 		debugLog("[HOTKEY] Failed to disable Snipping Tool PrintScreen: %v\n", err)
 		return
 	}
-	snippingToolDisabled = true
 	debugLn("[HOTKEY] Disabled Snipping Tool PrintScreen via registry")
 }
 
-// restoreSnippingToolPrintScreen re-enables the Snipping Tool PrintScreen mapping.
+// restoreSnippingToolPrintScreen puts the Snipping Tool PrintScreen mapping
+// back to what it was before we changed it. No-op if we never changed it.
 func restoreSnippingToolPrintScreen() {
-	if !snippingToolDisabled {
+	appKey, err := registry.OpenKey(registry.CURRENT_USER, appRegistryKey,
+		registry.QUERY_VALUE|registry.SET_VALUE)
+	if err != nil {
 		return
 	}
+	defer appKey.Close()
+
+	previous, _, err := appKey.GetIntegerValue(snippingPrevValueName)
+	if err != nil {
+		return
+	}
+
 	key, err := registry.OpenKey(registry.CURRENT_USER, snippingToolRegistryKey, registry.SET_VALUE)
 	if err != nil {
 		return
 	}
 	defer key.Close()
 
-	key.SetDWordValue(snippingToolValueName, 1)
-	snippingToolDisabled = false
+	if previous == snippingPrevAbsent {
+		err = key.DeleteValue(snippingToolValueName)
+		if err == registry.ErrNotExist {
+			err = nil
+		}
+	} else {
+		err = key.SetDWordValue(snippingToolValueName, 1)
+	}
+	if err != nil {
+		debugLog("[HOTKEY] Failed to restore Snipping Tool PrintScreen: %v\n", err)
+		return
+	}
+	appKey.DeleteValue(snippingPrevValueName)
 	debugLn("[HOTKEY] Restored Snipping Tool PrintScreen via registry")
 }
 

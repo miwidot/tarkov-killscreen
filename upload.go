@@ -19,16 +19,17 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/jpeg"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/textproto"
 	"strings"
 	"time"
-
 )
 
 // createImagePart creates a multipart form file part with Content-Type: image/jpeg
@@ -64,12 +65,45 @@ func apiURLs(savePath bool) []string {
 	return urls
 }
 
+// apiError means the server answered, but not with success.
+type apiError struct {
+	Status int
+	text   string
+}
+
+func (e *apiError) Error() string { return e.text }
+
+// transportError means no usable HTTP response arrived (DNS, connect, TLS,
+// timeout, connection dropped while reading the body).
+type transportError struct {
+	err error
+	// notSent is true when every attempt failed before the request left the
+	// machine (DNS or connect). Only then is it certain the server never saw
+	// the request, which is what makes repeating a non-idempotent call safe.
+	notSent bool
+}
+
+func (e *transportError) Error() string { return "request failed: " + e.err.Error() }
+func (e *transportError) Unwrap() error { return e.err }
+
+// failedBeforeSend reports whether err is a DNS or connect failure, i.e. the
+// request was never transmitted.
+func failedBeforeSend(err error) bool {
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return true
+	}
+	var opErr *net.OpError
+	return errors.As(err, &opErr) && opErr.Op == "dial"
+}
+
 // doWithFallback POSTs body to each URL in turn, falling back on transport
 // errors (DNS, connect, TLS). Returns the first response that arrives at
 // the server (any HTTP status code). The response body is returned drained
-// and closed.
+// and closed. Failures to get a response are returned as *transportError.
 func doWithFallback(urls []string, body []byte, headers http.Header) (int, []byte, error) {
 	var lastErr error
+	notSent := true
 	for i, target := range urls {
 		req, err := http.NewRequest("POST", target, bytes.NewReader(body))
 		if err != nil {
@@ -82,24 +116,67 @@ func doWithFallback(urls []string, body []byte, headers http.Header) (int, []byt
 		resp, err := apiClient.Do(req)
 		if err != nil {
 			lastErr = err
+			notSent = notSent && failedBeforeSend(err)
 			if i < len(urls)-1 {
 				fmt.Printf("[NETWORK] %s failed (%v), trying backup\n", target, err)
 				continue
 			}
-			return 0, nil, fmt.Errorf("request failed: %v", err)
+			break
 		}
 
 		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 		resp.Body.Close()
 		if readErr != nil {
-			return 0, nil, fmt.Errorf("failed to read response: %v", readErr)
+			return 0, nil, &transportError{err: fmt.Errorf("failed to read response: %w", readErr)}
 		}
 		if i > 0 {
 			fmt.Printf("[NETWORK] Used backup host: %s\n", target)
 		}
 		return resp.StatusCode, respBody, nil
 	}
-	return 0, nil, lastErr
+	if lastErr == nil {
+		return 0, nil, fmt.Errorf("no API URL configured")
+	}
+	return 0, nil, &transportError{err: lastErr, notSent: notSent}
+}
+
+// isRetryableUpload reports whether an OCR upload is worth repeating. The
+// server de-duplicates images by hash, so repeating an upload cannot create
+// duplicate kills.
+func isRetryableUpload(err error) bool {
+	var te *transportError
+	if errors.As(err, &te) {
+		return true
+	}
+	var ae *apiError
+	if errors.As(err, &ae) {
+		return ae.Status >= 500 || ae.Status == http.StatusTooManyRequests || ae.Status == http.StatusRequestTimeout
+	}
+	return false
+}
+
+// isRetryableSave is stricter than isRetryableUpload: saving a raid is not
+// known to be idempotent, so it is only repeated when the request provably
+// did not reach the application (never sent, or turned away by the proxy).
+func isRetryableSave(err error) bool {
+	var te *transportError
+	if errors.As(err, &te) {
+		return te.notSent
+	}
+	var ae *apiError
+	if errors.As(err, &ae) {
+		return ae.Status == http.StatusBadGateway || ae.Status == http.StatusServiceUnavailable ||
+			ae.Status == http.StatusTooManyRequests
+	}
+	return false
+}
+
+// maskToken returns a log-safe preview of an API token.
+func maskToken(token string) string {
+	if len(token) <= 8 {
+		return "(short)"
+	}
+	return token[:4] + "..." + token[len(token)-4:]
 }
 
 // KillData represents a single kill entry returned by the OCR API.
@@ -263,7 +340,7 @@ func UploadScreenshotData(jpegData []byte, cfg *Config) (*OCRResponse, error) {
 	}
 	token = strings.TrimSpace(token)
 
-	debugLog("[UPLOAD] Token length: %d, first 4: %s, last 4: %s\n", len(token), token[:4], token[len(token)-4:])
+	debugLog("[UPLOAD] Token length: %d, preview: %s\n", len(token), maskToken(token))
 	debugLog("[UPLOAD] URL: %s, Mode: %s\n", APIURL, cfg.API.Mode)
 
 	var body bytes.Buffer
@@ -318,6 +395,7 @@ func UploadScreenshotData(jpegData []byte, cfg *Config) (*OCRResponse, error) {
 }
 
 // UploadMultipleScreenshotData uploads multiple pre-compressed JPEG images in one request.
+// jpegDatas is left untouched so the caller can repeat the upload after a failure.
 func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse, error) {
 	if !cfg.API.Enabled {
 		return nil, fmt.Errorf("API upload disabled")
@@ -359,7 +437,6 @@ func UploadMultipleScreenshotData(jpegDatas [][]byte, cfg *Config) (*OCRResponse
 		if _, err := part.Write(jpegData); err != nil {
 			return nil, err
 		}
-		jpegDatas[i] = nil // Free original bytes early
 	}
 
 	writer.Close()
@@ -507,17 +584,22 @@ func SaveKills(ocrResp *OCRResponse, cfg *Config) (*SaveKillsResponse, error) {
 	}
 
 	var saveResp SaveKillsResponse
-	if err := json.Unmarshal(respBody, &saveResp); err != nil {
-		return nil, fmt.Errorf("failed to parse save response: %v", err)
-	}
+	parseErr := json.Unmarshal(respBody, &saveResp)
 
-	if statusCode != 200 || !saveResp.Success {
+	if statusCode != 200 || parseErr != nil || !saveResp.Success {
 		if saveResp.Error != "" {
 			// Check for event-related errors
 			if IsEventError(saveResp.Error) {
 				return nil, fmt.Errorf("event error: %s", saveResp.Error)
 			}
-			return nil, fmt.Errorf("save error: %s", saveResp.Error)
+			return nil, &apiError{Status: statusCode, text: "save error: " + saveResp.Error}
+		}
+		if statusCode != 200 {
+			// Typically an HTML error page from the proxy, not JSON
+			return nil, &apiError{Status: statusCode, text: fmt.Sprintf("save failed: %d", statusCode)}
+		}
+		if parseErr != nil {
+			return nil, fmt.Errorf("failed to parse save response: %v", parseErr)
 		}
 		return nil, fmt.Errorf("save failed: %d", statusCode)
 	}
@@ -533,9 +615,9 @@ func parseAPIError(statusCode int, body []byte) error {
 		Error string `json:"error"`
 	}
 	if json.Unmarshal(body, &errResp) == nil && errResp.Error != "" {
-		return fmt.Errorf("API error (%d): %s", statusCode, errResp.Error)
+		return &apiError{Status: statusCode, text: fmt.Sprintf("API error (%d): %s", statusCode, errResp.Error)}
 	}
-	return fmt.Errorf("API error: %d", statusCode)
+	return &apiError{Status: statusCode, text: fmt.Sprintf("API error: %d", statusCode)}
 }
 
 // setDeviceHeader adds the X-Device-ID header to an outgoing request.

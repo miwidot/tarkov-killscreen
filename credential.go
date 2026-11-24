@@ -69,15 +69,49 @@ func SaveToken(token string) error {
 	err := saveTokenCredMgr(token)
 
 	// Backup: encrypted in config.json
-	cfg, cfgErr := LoadConfig()
-	if cfgErr == nil {
-		if encrypted, encErr := encryptToken(token); encErr == nil {
-			cfg.EncryptedToken = encrypted
-			SaveConfig(cfg)
-		}
+	if encrypted, encErr := encryptToken(token); encErr == nil {
+		writeTokenBackup(encrypted)
 	}
 
 	return err
+}
+
+// writeTokenBackup stores the encrypted token (or "" to clear it) in
+// config.json. It goes through the live in-memory config when there is one:
+// writing only to the file would leave that struct stale, and its next
+// SaveConfig — event selection, settings dialog — would silently put the old
+// value back.
+func writeTokenBackup(encrypted string) {
+	cfg := config
+	if cfg == nil {
+		loaded, err := LoadConfig()
+		if err != nil {
+			return
+		}
+		cfg = loaded
+	}
+	if cfg.EncryptedToken == encrypted {
+		return
+	}
+	cfg.EncryptedToken = encrypted
+	SaveConfig(cfg)
+}
+
+// RepairTokenBackup rewrites the config.json backup when it is missing or no
+// longer matches the token in Credential Manager. Versions up to 1.0.12 could
+// lose or outdate the backup, so this heals existing installs on startup.
+func RepairTokenBackup() {
+	token, err := loadTokenCredMgr()
+	if err != nil || token == "" || config == nil {
+		return
+	}
+	if current, err := decryptToken(config.EncryptedToken); err == nil && current == token {
+		return
+	}
+	if encrypted, err := encryptToken(token); err == nil {
+		writeTokenBackup(encrypted)
+		debugLn("[TOKEN] Repaired encrypted token backup")
+	}
 }
 
 // LoadToken retrieves the API token. Tries Credential Manager first,
@@ -105,11 +139,7 @@ func LoadToken() (string, error) {
 // DeleteToken removes the API token from both Credential Manager and config.json.
 func DeleteToken() error {
 	// Remove from config.json
-	cfg, cfgErr := LoadConfig()
-	if cfgErr == nil && cfg.EncryptedToken != "" {
-		cfg.EncryptedToken = ""
-		SaveConfig(cfg)
-	}
+	writeTokenBackup("")
 
 	// Remove from Credential Manager
 	return deleteTokenCredMgr()

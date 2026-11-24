@@ -154,6 +154,9 @@ func RunApp() {
 	// Load or generate device ID for token binding
 	LoadOrCreateDeviceID()
 
+	// Restore the encrypted token backup if an older version lost it
+	RepairTokenBackup()
+
 	// Update autostart path if exe was moved
 	RefreshAutostart()
 
@@ -237,6 +240,24 @@ func RunApp() {
 // detected kills, and shows the result notification. Called after the 20s
 // batch timer expires.
 func processBatch() {
+	batchMutex.Lock()
+	if batchUploading {
+		// An upload is already running ("Process Now" clicked meanwhile, or
+		// the timer fired alongside it). Captures taken during it sit in
+		// pendingImages and are picked up when that upload finishes.
+		batchMutex.Unlock()
+		return
+	}
+	imageData := batchImages
+	batchImages = nil
+	batchTimer = nil
+	if len(imageData) == 0 {
+		batchMutex.Unlock()
+		return
+	}
+	batchUploading = true
+	batchMutex.Unlock()
+
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("[BATCH] PANIC recovered: %v\n", r) // Always log panics
@@ -258,29 +279,22 @@ func processBatch() {
 		fmt.Println("[READY] Waiting for screenshots...")
 	}()
 
-	batchMutex.Lock()
-	imageData := batchImages
-	batchImages = nil
-	batchTimer = nil
-	batchUploading = true
-	batchMutex.Unlock()
-
-	if len(imageData) == 0 {
-		return
-	}
-
 	uploadCount := len(imageData)
 	fmt.Printf("[BATCH] Processing %d images...\n", uploadCount) // User-facing status
 	showBalloon(T("batch.processing"), fmt.Sprintf(T("batch.uploading"), uploadCount))
 
+	// The kill screen is gone once the user leaves it, so a transient network
+	// or server failure must not cost them the batch: keep the images and retry.
 	var resp *OCRResponse
-	var err error
-
-	if len(imageData) == 1 {
-		resp, err = UploadScreenshotData(imageData[0], config)
-	} else {
-		resp, err = UploadMultipleScreenshotData(imageData, config)
-	}
+	err := withRetry("upload", isRetryableUpload, func() error {
+		var uploadErr error
+		if len(imageData) == 1 {
+			resp, uploadErr = UploadScreenshotData(imageData[0], config)
+		} else {
+			resp, uploadErr = UploadMultipleScreenshotData(imageData, config)
+		}
+		return uploadErr
+	})
 
 	// Clear byte slices to free memory
 	for i := range imageData {
@@ -330,14 +344,20 @@ func processBatch() {
 				PlayKillSound(config.Feedback.KillSoundPath)
 			}
 			// Save kills even if some images were invalid - server filters invalid ones
-			saveResp, err := SaveKills(resp, config)
+			var saveResp *SaveKillsResponse
+			saveKills := func() error {
+				var saveErr error
+				saveResp, saveErr = SaveKills(resp, config)
+				return saveErr
+			}
+			err := withRetry("save", isRetryableSave, saveKills)
 			if err != nil && IsEventError(err.Error()) {
 				// Event error — retry without event
 				fmt.Println("[BATCH] Event error, retrying without event:", err)
 				SetSelectedEventID("")
 				go buildEventMenu()
 				showWarning(T("event.error"), err.Error())
-				saveResp, err = SaveKills(resp, config)
+				err = withRetry("save", isRetryableSave, saveKills)
 			}
 			if err != nil {
 				fmt.Println("[BATCH] Save error:", err)
@@ -382,6 +402,31 @@ func processBatch() {
 
 	// Release memory back to OS after batch processing peak
 	debug.FreeOSMemory()
+}
+
+// retryDelays are the waits before each repeated attempt of a failed upload
+// or save. Together they ride out roughly a minute of outage.
+var retryDelays = []time.Duration{5 * time.Second, 15 * time.Second, 30 * time.Second}
+
+// withRetry runs fn and repeats it after each delay in retryDelays for as long
+// as it keeps failing with an error that retryable accepts. It returns the
+// last error, or nil once fn succeeds.
+func withRetry(what string, retryable func(error) bool, fn func() error) error {
+	err := fn()
+	for attempt, delay := range retryDelays {
+		if err == nil || !retryable(err) {
+			return err
+		}
+		fmt.Printf("[RETRY] %s failed (%v), attempt %d/%d in %s\n",
+			what, err, attempt+2, len(retryDelays)+1, delay)
+		if attempt == 0 {
+			// One notice is enough; the final outcome gets its own message.
+			showBalloon(T("upload.retry"), T("upload.retry.msg"))
+		}
+		time.Sleep(delay)
+		err = fn()
+	}
+	return err
 }
 
 // buildTrayMenu populates the system tray context menu with status info,

@@ -6,11 +6,12 @@
 //
 // Flow:
 //   1. Download new exe to <current>.new
-//   2. Verify signature (signtool) if available
-//   3. Rename running exe to <current>.old
-//   4. Rename .new to <current>
-//   5. Start new exe, exit current
-//   6. On next start: delete .old
+//   2. Basic sanity check (PE header, plausible size)
+//   3. Verify the Authenticode signature and publisher (authenticode.go)
+//   4. Rename running exe to <current>.old
+//   5. Rename .new to <current>
+//   6. Start new exe, exit current
+//   7. On next start: delete .old
 package main
 
 import (
@@ -99,7 +100,16 @@ func PerformSelfUpdate(release GithubRelease) error {
 		return fmt.Errorf("verification failed: %w", err)
 	}
 
-	// Step 3: Rename current exe to .old (Windows allows renaming a running exe)
+	// Step 3: Verify it was signed by us. Only the local test mode of debug
+	// builds skips this, since test exes are usually unsigned.
+	if debugMode && selfUpdateTestPath != "" {
+		debugLn("[UPDATE] Test mode: skipping publisher check")
+	} else if err := verifyPublisher(newPath); err != nil {
+		os.Remove(newPath)
+		return fmt.Errorf("verification failed: %w", err)
+	}
+
+	// Step 4: Rename current exe to .old (Windows allows renaming a running exe)
 	// Remove stale .old first if cleanup failed last time
 	os.Remove(oldPath)
 	if err := os.Rename(exe, oldPath); err != nil {
@@ -107,7 +117,7 @@ func PerformSelfUpdate(release GithubRelease) error {
 		return fmt.Errorf("cannot rename current exe: %w", err)
 	}
 
-	// Step 4: Rename .new to current
+	// Step 5: Rename .new to current
 	if err := os.Rename(newPath, exe); err != nil {
 		// Rollback: try to restore old exe
 		os.Rename(oldPath, exe)
@@ -116,7 +126,7 @@ func PerformSelfUpdate(release GithubRelease) error {
 
 	debugLn("[UPDATE] Exe replaced successfully")
 
-	// Step 5: Start the new exe and exit
+	// Step 6: Start the new exe and exit
 	fmt.Println("[UPDATE] Restarting...")
 	startNewExe(exe)
 	return nil
